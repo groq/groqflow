@@ -5,7 +5,7 @@ GroqFlow™ is the easiest way to get started with Groq's technology. GroqFlow p
 We recommend that your system meets the following hardware requirements:
 
 - To build models: 32GB or more of RAM.
-- To run models: 8 GroqChip processors is recommended, especially for larger models.
+- To run models: at least 1 GroqChip processor. For larger models, additional GroqChip processors may be required (1, 2, 4, and 8).
 
 ---
 
