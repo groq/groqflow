@@ -12,7 +12,7 @@ def groqit(
     build_name: Optional[str] = None,
     cache_dir: str = build.DEFAULT_CACHE_DIR,
     monitor: bool = True,
-    rebuild: str = build.DEFAULT_REBUILD_POLICY,
+    rebuild: Optional[str] = None,
     compiler_flags: Optional[List[str]] = None,
     assembler_flags: Optional[List[str]] = None,
     num_chips: Optional[int] = None,
@@ -24,11 +24,11 @@ def groqit(
 
     Args:
         model: Model to be mapped to a GroqModel, which can be a PyTorch
-            model instance, a path to an ONNX file, or a path to a Python script
-            that follows the ML Agility model.py template.
+            model instance, Keras model instance, a path to an ONNX file, or
+            a path to a Python script that follows the GroqFlow model.py template.
         inputs: Example inputs to the user's model. The GroqModel will be
             compiled to handle inputs with the same static shape only. Argument
-            is not required if the model input is an ML Agility model.py file.
+            is not required if the model input is a GroqFlow model.py file.
         build_name: Unique name for the model that will be
             used to store the GroqModel and build state on disk. Defaults to the
             name of the file that calls groqit().
@@ -42,6 +42,7 @@ def groqit(
             - "always": overwrite valid cached builds with a rebuild
             - "never": load cached builds without checking validity, with no guarantee
                 of functionality or correctness
+            - None: Falls back to default
         compiler_flags: Override groqit's default compiler flags with a list
             of user-specified flags.
         assembler_flags: Override groqit's default assembler flags with a
@@ -81,7 +82,7 @@ def groqit(
     state = ignition.load_or_make_state(
         config=config,
         cache_dir=cache_dir,
-        rebuild=rebuild,
+        rebuild=rebuild or build.DEFAULT_REBUILD_POLICY,
         model_type=model_type,
         monitor=monitor,
         use_sdk=build.USE_SDK,

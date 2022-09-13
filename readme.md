@@ -5,7 +5,7 @@ GroqFlow™ is the easiest way to get started with Groq's technology. GroqFlow p
 We recommend that your system meets the following hardware requirements:
 
 - To build models: 32GB or more of RAM.
-- To run models: at least 1 GroqChip processor. For larger models, additional GroqChip processors may be required (1, 2, 4, and 8).
+- To run models: 8 GroqChip processors is recommended, especially for larger models.
 
 ---
 
@@ -29,11 +29,15 @@ To Groq a PyTorch model, simply provide your model and inputs to the `groqit()` 
 
 ## Navigating GroqFlow
 
+* [demo_helpers](demo_helpers/): Scripts used for GroqFlow demos and proof points.
+
 * [docs](docs/): All information you'd need to be successful with GroqFlow.
 
 * [examples](examples/): Includes various GroqFlow examples.
 
 * [groqflow](groqflow/): The source code for the `groqflow` package.
+
+* [proof_points](proof_points/): Machine learning proof points using GroqFlow.
 
 * readme.md
 

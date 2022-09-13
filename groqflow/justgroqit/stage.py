@@ -3,7 +3,6 @@ import sys
 import time
 import os
 from typing import List, Tuple
-from contextlib import redirect_stdout
 from multiprocessing import Process
 import groqflow.common.printing as printing
 import groqflow.common.exceptions as exp
@@ -115,11 +114,14 @@ class GroqitStage(abc.ABC):
             self.progress.start()
 
         try:
-            with open(self.logfile_path, "w", encoding="utf") as logfile:
-                with redirect_stdout(logfile):
-                    state = self.fire(state)
+            sys.stdout = build.Logger(self.logfile_path)
+            state = self.fire(state)
+            sys.stdout = sys.stdout.terminal
 
         except exp.GroqitStageError:
+            # Stop redirecting output to log file
+            sys.stdout = sys.stdout.terminal
+
             self.status_line(
                 successful=False,
                 verbosity=state.monitor,
@@ -185,10 +187,19 @@ def _rewind_stdout(lines: int):
 
 
 class Sequence(GroqitStage):
-    def __init__(self, unique_name, monitor_message, stages: List[GroqitStage]):
+    def __init__(
+        self,
+        unique_name,
+        monitor_message,
+        stages: List[GroqitStage],
+        enable_model_validation=False,
+    ):
         super().__init__(unique_name, monitor_message)
 
         self.stages = stages
+
+        # Follow default model validation steps in ignition.model_intake()
+        self.enable_model_validation = enable_model_validation
 
         # Make sure all the stage names are unique
         stage_names = self.get_names()
@@ -199,6 +210,23 @@ class Sequence(GroqitStage):
             received duplicates in the list of names: {stage_names}
             """
             raise ValueError(msg)
+
+    @property
+    def unrolled_stages(self):
+        """
+        Recursively goes through all sequences and returns list of stages
+        """
+
+        def unroll_stages(stages):
+            unrolled_stages = []
+            for stage in stages:
+                if isinstance(stage, Sequence):
+                    unrolled_stages += unroll_stages(stage.stages)
+                else:
+                    unrolled_stages += [stage]
+            return unrolled_stages
+
+        return unroll_stages(self.stages)
 
     def show_monitor(self, config: build.Config, verbosity: bool):
         """
@@ -241,7 +269,7 @@ class Sequence(GroqitStage):
             raise exp.GroqFlowError(msg)
 
         try:
-            for stage in self.stages:
+            for stage in self.unrolled_stages:
                 state = stage.fire_helper(state)
 
         except exp.GroqitStageError as e:
@@ -252,6 +280,7 @@ class Sequence(GroqitStage):
             )
             stdout_lines_to_advance = stage_depth_in_sequence - 2
             cursor_down = "\n" * stdout_lines_to_advance
+
             print(cursor_down)
 
             printing.log_error(e)

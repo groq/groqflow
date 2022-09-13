@@ -49,6 +49,7 @@ def get_multi_tsp_runner(
         compile_dir,
         program_name,
         user_config=topo_config[topology],
+        speed=speed_config[topology],
     )
     return tsp_runner
 

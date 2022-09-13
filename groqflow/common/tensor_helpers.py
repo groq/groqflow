@@ -9,6 +9,13 @@ import numpy as np
 import groqflow.common.exceptions as exp
 import groqflow.common.build as build
 
+try:
+    import tensorflow as tf
+except ModuleNotFoundError as module_error:
+    raise exp.GroqitEnvError(
+        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
+        "You must install tensorflow to continue."
+    )
 
 # Checks whether a given input has the expected shape
 def check_shapes_and_dtypes(inputs, expected_shapes, expected_dtypes):
@@ -40,6 +47,8 @@ def save_inputs(inputs, inputs_file):
                 continue
             if torch.is_tensor(inputs_converted[i][k]):
                 inputs_converted[i][k] = inputs_converted[i][k].cpu().detach().numpy()
+            if tf.is_tensor(inputs_converted[i][k]):
+                inputs_converted[i][k] = inputs_converted[i][k].numpy()
             if (
                 inputs_converted[i][k].dtype == np.float32
                 or inputs_converted[i][k].dtype == np.float64

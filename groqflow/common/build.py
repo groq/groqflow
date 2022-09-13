@@ -1,4 +1,5 @@
 import os
+import sys
 import pathlib
 import copy
 import enum
@@ -11,6 +12,14 @@ import torch
 import numpy as np
 import groqflow.common.exceptions as exp
 
+try:
+    import tensorflow as tf
+except ModuleNotFoundError as module_error:
+    raise exp.GroqitEnvError(
+        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
+        "You must install tensorflow to continue."
+    )
+
 
 DEFAULT_ONNX_OPSET = 13
 MINIMUM_ONNX_OPSET = 11
@@ -20,6 +29,7 @@ UnionValidModelInstanceTypes = Union[
     str,
     torch.nn.Module,
     torch.jit.ScriptModule,
+    tf.keras.Model,
 ]
 
 
@@ -33,6 +43,7 @@ environment_variables = {
     "rebuild": "GROQIT_REBUILD_POLICY",
     "dont_use_sdk": "GROQFLOW_BAKE_SDK",
     "target_a11": "GROQFLOW_LEGACY_A11",
+    "debug": "GROQFLOW_DEBUG",
 }
 
 # Allow an environment variable to override the default
@@ -41,6 +52,9 @@ if os.environ.get(environment_variables["cache_dir"]):
     DEFAULT_CACHE_DIR = os.environ.get(environment_variables["cache_dir"])
 else:
     DEFAULT_CACHE_DIR = os.path.expanduser("~/.cache/groqflow")
+
+# Download torch model weights to groqflow cache in processes that use this file.
+torch.hub.set_dir(os.path.join(DEFAULT_CACHE_DIR, "torch/hub"))
 
 # Allow an environment variable to override the default
 # rebuild policy
@@ -80,6 +94,7 @@ class Backend(enum.Enum):
 
 class ModelType(enum.Enum):
     PYTORCH = "pytorch"
+    KERAS = "keras"
     ONNX_FILE = "onnx_file"
     UNKNOWN = "unknown"
 
@@ -153,6 +168,22 @@ def hash_model(model, model_type: ModelType):
         # Return hash of topology and parameters
         return hashlib.sha256(hashable_model).hexdigest()
 
+    elif model_type == ModelType.KERAS:
+        # Convert model parameters and topology to string
+        summary_list = []  # type: List[str]
+
+        # pylint: disable=unnecessary-lambda
+        model.summary(print_fn=lambda x: summary_list.append(x))
+
+        summary_str = " ".join(summary_list)
+        hashable_params = {}
+        for layer in model.layers:
+            hashable_params[layer.name] = layer.weights
+        hashable_model = (summary_str + str(hashable_params)).encode()
+
+        # Return hash of topology and parameters
+        return hashlib.sha256(hashable_model).hexdigest()
+
     else:
         msg = f"""
         model_type "{model_type}" unsupported by groqit's hash_model function
@@ -189,6 +220,7 @@ def get_shapes_and_dtypes(inputs: dict):
                 (list, tuple),
             )
             or torch.is_tensor(value)
+            or tf.is_tensor(value)
         ):
             shapes[key] = np.array(value).shape
             dtypes[key] = np.array(value).dtype.name
@@ -495,3 +527,27 @@ def load_state(
         raise exp.GroqitStateError(msg)
 
     return state
+
+
+class Logger:
+    """
+    Redirects stdout to to file (and console if needed)
+    """
+
+    def __init__(self, log_path=None):
+        self.debug = os.environ.get(environment_variables["debug"]) == "True"
+        self.terminal = sys.stdout
+        self.log_file = (
+            None if log_path is None else open(log_path, "w", encoding="utf8")
+        )
+
+    def write(self, message):
+        if self.log_file is not None:
+            self.log_file.write(message)
+        if self.debug or self.log_file is None:
+            self.terminal.write(message)
+            self.terminal.flush()
+
+    def flush(self):
+        # needed for python 3 compatibility.
+        pass
