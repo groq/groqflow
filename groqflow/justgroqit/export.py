@@ -13,6 +13,15 @@ import groqflow.common.tensor_helpers as tensor_helpers
 import groqflow.common.onnx_helpers as onnx_helpers
 import groqflow.common.sdk_helpers as sdk
 
+try:
+    import tensorflow as tf
+    import tf2onnx
+except ModuleNotFoundError as module_error:
+    raise exp.GroqitEnvError(
+        "GroqFlow added a dependence on tensorflow and tf2onnx in version 2.1.2. "
+        "You must install tensorflow and tf2onnx to continue."
+    )
+
 
 def _check_model(onnx_file, success_message, fail_message) -> bool:
     if os.path.isfile(onnx_file):
@@ -156,32 +165,36 @@ class ExportPytorchModel(stage.GroqitStage):
         # TODO: check that state.inputs is valid
         # https://git.groq.io/code/Groq/-/issues/13947
 
-        # ONNX export only accepts positional inputs
-        if isinstance(state.model, torch.jit.ScriptModule):
-            dummy_inputs = tuple(state.inputs.values())
-            dummy_input_names = tuple(state.inputs.keys())
-        else:
-            all_args = list(inspect.signature(state.model.forward).parameters.keys())
-            user_provided_args = state.inputs.keys()
-            inputs = []
-            input_names = []
+        # ONNX export accepts a tuple of positional inputs followed by
+        # dict with all keyword inputs; the dict must be last item in tuple
+        user_provided_args = list(state.inputs.keys())
+        number_of_provided_args = len(user_provided_args)
 
+        if isinstance(state.model, torch.nn.Module):
+            # validate user provided args
+            all_args = list(inspect.signature(state.model.forward).parameters.keys())
             for inp in user_provided_args:
                 if inp not in all_args:
                     msg = f"""
                     Input name {inp} not found in the model's forward method. Available
-                    inputs are: {all_args}"
+                    input names are: {all_args}"
                     """
                     raise ValueError(msg)
+            # if not a single input arg, pass as ({arg_name:value},)
+            if number_of_provided_args > 1:
+                dummy_inputs = (state.inputs,)
 
-            for _, arg in enumerate(all_args):
-                if arg in user_provided_args:
-                    inputs.append(state.inputs[arg])
-                else:
-                    inputs.append(None)
-                input_names.append(arg)
-            dummy_inputs = tuple(inputs)
-            dummy_input_names = tuple(input_names)
+            else:  # single input arg
+                dummy_inputs = tuple(state.inputs.values())
+
+        # TODO: Test with optional inputs
+        # https://git.groq.io/code/Groq/-/issues/14581
+
+        else:  # state.model is a torch.jit.ScriptModule
+            dummy_inputs = tuple(state.inputs.values())
+
+        # Collect input names
+        dummy_input_names = tuple(state.inputs.keys())
 
         state.info.opset = build.DEFAULT_ONNX_OPSET
 
@@ -197,7 +210,6 @@ class ExportPytorchModel(stage.GroqitStage):
             opset_version=state.info.opset,
             verbose=False,
         )
-        state.inputs = dict(zip(dummy_input_names, dummy_inputs))
 
         # Save inputs and convert to fp16 and int32 (no int64 nor float32/64)
         tensor_helpers.save_inputs([state.inputs], state.original_inputs_file)
@@ -214,6 +226,116 @@ class ExportPytorchModel(stage.GroqitStage):
         else:
             msg = f"""
             Unable to export model to ONNX using Torch's ONNX exporter.
+            We recommend that you modify your model until it is
+            compatible with this third party software, then re-run groqit().
+            More information may be available in the log file at **{self.logfile_path}**
+            """
+            raise exp.GroqitStageError(msg)
+
+        return state
+
+
+class ExportKerasModel(stage.GroqitStage):
+    """
+    Stage that takes a Keras model instance, in state.model, and
+    exports it to an ONNX file.
+
+    Expected inputs:
+     - state.model is a tf.keras.Model
+     - state.inputs is a dict that represents valid kwargs to the forward
+        function of state.model
+
+    Outputs:
+     - A *-base.onnx file that implements state.model given state.inputs
+    """
+
+    def __init__(self):
+        super().__init__(
+            unique_name="export_keras",
+            monitor_message="Exporting Keras to ONNX",
+        )
+
+    def fire(self, state: build.State):
+        if not isinstance(state.model, (tf.keras.Model)):
+            msg = f"""
+            The current stage (ExportKerasModel) is only compatible with
+            models of type tf.keras.Model, however
+            the stage received a model of type {type(state.model)}.
+            """
+            raise exp.GroqitStageError(msg)
+
+        user_provided_args = state.inputs.keys()
+
+        all_args = []
+
+        # Check the model inputs member
+        if state.model.inputs:
+            all_args = [x.name for x in state.model.inputs]
+
+        # If the input name(s) cannot be extracted from the inputs variable
+        # than try to find them in the call() method
+        if len(all_args) == 0:
+            all_args = list(inspect.signature(state.model.call).parameters.keys())
+
+        inputs = []
+        input_names = []
+
+        for inp in user_provided_args:
+            if inp not in all_args:
+                msg = f"""
+                Input name {inp} not found in the model's forward method. Available
+                input names are: {all_args}"
+                """
+                raise ValueError(msg)
+
+        for _, arg in enumerate(all_args):
+            if arg in user_provided_args:
+                inputs.append(state.inputs[arg])
+                input_names.append(arg)
+
+        input_specs = []
+        for inp, name in zip(inputs, input_names):
+            dtype = inp.dtype
+            shape = inp.shape
+            if inp.dtype == tf.float64:
+                print(f"Converting input {name} from float64 to float32")
+                dtype = tf.float32
+            if inp.dtype == tf.int64:
+                print(f"Converting input {name} from int64 to int32")
+                dtype = tf.int32
+            if inp.shape[0] is None:
+                print("Found batch size None and setting it to 1")
+                shape = (1, shape[1:])
+
+            input_specs.append(tf.TensorSpec(shape, dtype, name))
+
+        state.info.opset = build.DEFAULT_ONNX_OPSET
+
+        # Export the model to ONNX
+        tf2onnx.convert.from_keras(
+            state.model,
+            input_signature=input_specs,
+            opset=state.info.opset,
+            output_path=state.base_onnx_file,
+        )
+
+        state.inputs = dict(zip(tuple(input_names), tuple(inputs)))
+
+        # Save inputs and convert to fp16 and int32 (no int64 nor float32/64)
+        tensor_helpers.save_inputs([state.inputs], state.original_inputs_file)
+
+        # Check the if the base mode has been exported successfully
+        success_msg = "\tSuccess exporting model to ONNX"
+        fail_msg = "\tFailed exporting model to ONNX"
+        state.info.base_onnx_exported = _check_model(
+            state.base_onnx_file, success_msg, fail_msg
+        )
+
+        if state.info.base_onnx_exported:
+            state.intermediate_results = [state.base_onnx_file]
+        else:
+            msg = f"""
+            Unable to export model to ONNX using tf2onnx exporter.
             We recommend that you modify your model until it is
             compatible with this third party software, then re-run groqit().
             More information may be available in the log file at **{self.logfile_path}**

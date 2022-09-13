@@ -12,6 +12,42 @@ import groqflow.common.onnx_helpers as onnx_helpers
 import groqflow.common.sdk_helpers as sdk
 
 
+def get_and_analyze_onnx(state: build.State):
+    # TODO: validate this input
+    # https://git.groq.io/code/Groq/-/issues/13947
+    input_onnx = state.intermediate_results[0]
+
+    (
+        state.info.compiled_onnx_input_bytes,
+        state.info.compiled_onnx_output_bytes,
+    ) = onnx_helpers.io_bytes(input_onnx)
+
+    # Count the number of trained model parameters
+    onnx_model = onnx.load(input_onnx)
+    state.info.num_parameters = int(onnx_helpers.parameter_count(onnx_model))
+
+    # Automatically define the number of chips if num_chips is not provided
+    if state.config.num_chips is None:
+        state.num_chips_used = build.calculate_num_chips(state.info.num_parameters)
+    else:
+        state.num_chips_used = state.config.num_chips
+
+    # Compile model
+    max_chips = build.max_chips(state.config.groqcard)
+    if not state.num_chips_used <= max_chips:
+        msg = f"""
+        groqit() automatically decided that {state.num_chips_used} GroqChip
+        processors are needed to build model "{state.config.build_name}.
+        chips supported by groqit at this time ({max_chips}).
+
+        Hint: you can ask groqit to build with a specific number of chips
+        less than {max_chips} by setting the num_chips argument in groqit().
+        """
+        raise exp.GroqitStageError(msg)
+
+    return input_onnx
+
+
 class CompileOnnx(stage.GroqitStage):
     """
     Stage that takes an ONNX file and compiles it into one or more
@@ -38,39 +74,7 @@ class CompileOnnx(stage.GroqitStage):
             require_devtools=True, exception_type=exp.GroqitStageError
         )
 
-        # TODO: validate this input
-        # https://git.groq.io/code/Groq/-/issues/13947
-        input_onnx = state.intermediate_results[0]
-
-        (
-            state.info.compiled_onnx_input_bytes,
-            state.info.compiled_onnx_output_bytes,
-        ) = onnx_helpers.io_bytes(input_onnx)
-
-        # Count the number of trained model parameters
-        onnx_model = onnx.load(input_onnx)
-        state.info.num_parameters = int(onnx_helpers.parameter_count(onnx_model))
-
-        # Automatically define the number of chips if num_chips is not provided
-        if state.config.num_chips is None:
-            state.num_chips_used = build.calculate_num_chips(
-                state.info.num_parameters
-            )
-        else:
-            state.num_chips_used = state.config.num_chips
-
-        # Compile model
-        max_chips = build.max_chips(state.config.groqcard)
-        if not state.num_chips_used <= max_chips:
-            msg = f"""
-            groqit() automatically decided that {state.num_chips_used} GroqChip
-            processors are needed to build model "{state.config.build_name}.
-            chips supported by groqit at this time ({max_chips}).
-
-            Hint: you can ask groqit to build with a specific number of chips
-            less than {max_chips} by setting the num_chips argument in groqit().
-            """
-            raise exp.GroqitStageError(msg)
+        input_onnx = get_and_analyze_onnx(state)
 
         # Create output folder if it doesn't exist
         if not os.path.isdir(state.compile_dir):

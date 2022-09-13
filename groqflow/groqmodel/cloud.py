@@ -1,7 +1,7 @@
 import os
+import sys
 from typing import Tuple, Union
 from stat import S_ISDIR
-from contextlib import redirect_stdout
 import yaml
 import paramiko
 import groqflow.common.exceptions as exp
@@ -172,47 +172,50 @@ def execute_remotely(
     configure_remote()
 
     # Redirect all stdout to log_file
-    with redirect_stdout(open(log_execute_path, "w", encoding="utf")):
+    sys.stdout = build.Logger(log_execute_path)
 
-        # Connect to remote machine and transfer common files
-        client = setup_connection()
+    # Connect to remote machine and transfer common files
+    client = setup_connection()
 
-        # Transfer iop and inputs file
-        print("Transferring model and inputs...")
-        if not os.path.exists(state.execution_inputs_file):
-            msg = "Model input file not found"
-            raise exp.GroqModelRuntimeError(msg)
+    # Transfer iop and inputs file
+    print("Transferring model and inputs...")
+    if not os.path.exists(state.execution_inputs_file):
+        msg = "Model input file not found"
+        raise exp.GroqModelRuntimeError(msg)
 
-        with MySFTPClient.from_transport(client.get_transport()) as s:
-            s.mkdir("groqflow_remote_cache/compile")
-            s.put_dir(state.compile_dir, "groqflow_remote_cache/compile")
-            s.put(state.execution_inputs_file, "groqflow_remote_cache/inputs.npy")
+    with MySFTPClient.from_transport(client.get_transport()) as s:
+        s.mkdir("groqflow_remote_cache/compile")
+        s.put_dir(state.compile_dir, "groqflow_remote_cache/compile")
+        s.put(state.execution_inputs_file, "groqflow_remote_cache/inputs.npy")
 
-        # Run benchmarking script
-        output_dir = "groqflow_remote_cache"
-        remote_outputs_file = "groqflow_remote_cache/outputs.npy"
-        remote_latency_file = "groqflow_remote_cache/latency.npy"
-        print("Running benchmarking script...")
-        bringup_topology_arg = "" if bringup_topology else "--bringup_topology"
-        _, exit_code = exec_command(
-            client,
-            (
-                f"/usr/local/groq/bin/python groqflow_remote_cache/execute.py "
-                f"{state.num_chips_used} {output_dir} {remote_outputs_file} "
-                f"{remote_latency_file} {state.topology} {repetitions} "
-                f"{bringup_topology_arg}"
-            ),
-        )
-        if exit_code == 1:
-            msg = f"""
-            Failed to execute GroqChip(s) remotely.
-            Look at **{log_execute_path}** for details.
-            """
-            raise exp.GroqModelRuntimeError(msg)
+    # Run benchmarking script
+    output_dir = "groqflow_remote_cache"
+    remote_outputs_file = "groqflow_remote_cache/outputs.npy"
+    remote_latency_file = "groqflow_remote_cache/latency.npy"
+    print("Running benchmarking script...")
+    bringup_topology_arg = "" if bringup_topology else "--bringup_topology"
+    _, exit_code = exec_command(
+        client,
+        (
+            f"/usr/local/groq/bin/python groqflow_remote_cache/execute.py "
+            f"{state.num_chips_used} {output_dir} {remote_outputs_file} "
+            f"{remote_latency_file} {state.topology} {repetitions} "
+            f"{bringup_topology_arg}"
+        ),
+    )
+    if exit_code == 1:
+        msg = f"""
+        Failed to execute GroqChip(s) remotely.
+        Look at **{log_execute_path}** for details.
+        """
+        raise exp.GroqModelRuntimeError(msg)
 
-        # Get output files back
-        with MySFTPClient.from_transport(client.get_transport()) as s:
-            s.get(remote_outputs_file, state.outputs_file)
-            s.get(remote_latency_file, state.latency_file)
-            s.remove(remote_outputs_file)
-            s.remove(remote_latency_file)
+    # Get output files back
+    with MySFTPClient.from_transport(client.get_transport()) as s:
+        s.get(remote_outputs_file, state.outputs_file)
+        s.get(remote_latency_file, state.latency_file)
+        s.remove(remote_outputs_file)
+        s.remove(remote_latency_file)
+
+    # Stop redirecting stdout
+    sys.stdout = sys.stdout.terminal

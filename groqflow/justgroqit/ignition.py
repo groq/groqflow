@@ -15,6 +15,13 @@ import groqflow.common.printing as printing
 import groqflow.common.build as build
 import groqflow.common.cache as cache
 
+try:
+    import tensorflow as tf
+except ModuleNotFoundError as module_error:
+    raise exp.GroqitEnvError(
+        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
+        "You must install tensorflow to continue."
+    )
 
 default_pytorch_export_sequence = stage.Sequence(
     "default_pytorch_export_sequence",
@@ -32,6 +39,27 @@ default_pytorch_sequence = stage.Sequence(
     "Building PyTorch Model",
     [
         default_pytorch_export_sequence,
+        compile.CompileOnnx(),
+        compile.Assemble(),
+    ],
+)
+
+default_keras_export_sequence = stage.Sequence(
+    "default_keras_export_sequence",
+    "Exporting Keras Model",
+    [
+        export.ExportKerasModel(),
+        export.OptimizeOnnxModel(),
+        export.CheckOnnxCompatibility(),
+        export.ConvertOnnxToFp16(),
+    ],
+)
+
+default_keras_sequence = stage.Sequence(
+    "default_keras_sequence",
+    "Building Keras Model",
+    [
+        default_keras_export_sequence,
         compile.CompileOnnx(),
         compile.Assemble(),
     ],
@@ -468,14 +496,17 @@ def _load_model_from_file(path_to_model, user_inputs):
                 """
                 raise exp.GroqitIntakeError(msg)
 
-        elif isinstance(model, (torch.nn.Module, torch.jit.ScriptModule)):
+        elif isinstance(
+            model, (torch.nn.Module, torch.jit.ScriptModule, tf.keras.Model)
+        ):
             return model, inputs, corpus
 
         else:
             msg = f"""
             groqit() received a model argument that was a path to a model.py file.
-            However, model.py file are required to return either an ONNX file path or
-            a PyTorch model object, however the model.py provided did neither: {model}
+            All model.py files are required to return either an ONNX file path,
+            a PyTorch model object, or a Keras model object, however the model.py
+            provided none of these: {model}
             """
             raise exp.GroqitIntakeError(msg)
 
@@ -493,6 +524,7 @@ def _load_model_from_file(path_to_model, user_inputs):
 
 model_type_to_sequence = {
     build.ModelType.PYTORCH: default_pytorch_sequence,
+    build.ModelType.KERAS: default_keras_sequence,
     build.ModelType.ONNX_FILE: default_onnx_sequence,
 }
 
@@ -529,7 +561,9 @@ def _validate_inputs(inputs: Dict, model_dot_py_used: bool):
 
 
 def model_intake(
-    user_model, user_inputs, user_sequence: Optional[stage.Sequence]
+    user_model,
+    user_inputs,
+    user_sequence: Optional[stage.Sequence],
 ) -> Tuple[Any, Any, stage.Sequence, build.ModelType, str]:
 
     # Model intake structure options:
@@ -546,8 +580,10 @@ def model_intake(
     #    |                   |------- returns a pytorch model object, inputs
     #    |
     #    |------- pytorch model object
+    #    |
+    #    |------- keras model object
 
-    if user_sequence is None:
+    if user_sequence is None or user_sequence.enable_model_validation:
 
         if user_model is None and user_inputs is None:
             msg = """
@@ -572,14 +608,29 @@ def model_intake(
         elif isinstance(model, str):
             if model.endswith(".onnx"):
                 model_type = build.ModelType.ONNX_FILE
+        elif isinstance(model, tf.keras.Model):
+            model_type = build.ModelType.KERAS
+            if not tf.executing_eagerly():
+                raise exp.GroqitIntakeError(
+                    "`groqit()` requires Keras models to be run in eager execution mode. "
+                    "Enable eager execution to continue."
+                )
+            if not model.built:
+                raise exp.GroqitIntakeError(
+                    "Keras model has not been built. Please call "
+                    "model.build(input_shape) before running groqit()"
+                )
         else:
             raise exp.GroqitIntakeError(
                 "Argument 'model' passed to groqit() is "
                 f"of unsupported type {type(model)}"
             )
 
-        # Assign a sequence based on the ModelType
-        sequence = model_type_to_sequence[model_type]
+        if user_sequence is None:
+            # Assign a sequence based on the ModelType
+            sequence = model_type_to_sequence[model_type]
+        else:
+            sequence = user_sequence
 
         _validate_inputs(inputs, model_dot_py_used)
 

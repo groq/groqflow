@@ -51,6 +51,7 @@ Returns a callable `GroqModel` instance that works like a PyTorch model (torch.n
 - Model to be mapped to Groq hardware.
 - Can be an instance of:
   - PyTorch model (torch.nn.Module)
+  - Keras model (tf.keras.Model)
   - TorchScript model (torch.jit.ScriptModule)
   - ONNX model (path/to/.onnx)
 
@@ -58,7 +59,7 @@ Returns a callable `GroqModel` instance that works like a PyTorch model (torch.n
 
 - Used by `groqit()` to determine the shape of input to build against.
 - Dictates the maximum input size the model will support.
-- Same exact format as your PyTorch inputs.
+- Same exact format as your model inputs.
 - Inputs provided here can be dummy inputs.
 - *Hint*: At runtime, pad your inference inputs to this expected input size.
 
@@ -73,10 +74,12 @@ Returns a callable `GroqModel` instance that works like a PyTorch model (torch.n
 ### Examples:
 
 ```
-groqit(my_pytorch_model, inputs)
+groqit(my_model, inputs)
 ```
 
-See `examples/hello_pytorch_world.py`
+See
+ - `examples/pytorch/hello_world.py`
+ - `examples/keras/hello_world.py`
 
 ---
 
@@ -114,7 +117,7 @@ GroqFlow displays a monitor on the command line that updates the progress of `gr
 groqit(model, inputs, monitor=False)
 ```
 
-See: `examples/no_monitor.py`
+See: `examples/pytorch/no_monitor.py`
 
 ---
 
@@ -140,8 +143,8 @@ groqit(model, inputs, rebuild="never")
 ```
 
 See:
- - `examples/rebuild_always.py`
- - `examples/rebuild_never.py`
+ - `examples/pytorch/rebuild_always.py`
+ - `examples/pytorch/rebuild_never.py`
 
 ---
 
@@ -177,7 +180,7 @@ gmodel_a = groqit(model_a, inputs_a)
 gmodel_b = groqit(model_b, inputs_b)
 ```
 
-See: `examples/build_names.py`
+See: `examples/pytorch/build_names.py`
 
 ---
 
@@ -198,7 +201,7 @@ gmodel = groqit(model, inputs, groqview=True)
 gmodel.groqview()
 ```
 
-See: `examples/groqview.py`
+See: `examples/pytorch/groqview.py`
 
 ---
 
@@ -218,7 +221,7 @@ Warning: at this time, `groqit()` does nothing to ensure that you are providing 
 gmodel = groqit(model, inputs, compiler_flags = ['--disableAddressCompaction', '--extraInstMemSlices=12'])
 ```
 
-See: `examples/compiler_flags.py`
+See: `examples/pytorch/compiler_flags.py`
 
 ---
 
@@ -238,7 +241,7 @@ Warning: at this time, `groqit()` does nothing to ensure that you are providing 
 gmodel = groqit(model, inputs, assembler_flags = ['--auto-agt-dim=2'])
 ```
 
-See: `examples/assembler_flags.py`
+See: `examples/pytorch/assembler_flags.py`
 
 ---
 
@@ -278,7 +281,7 @@ Resulting contents of ~:
       ...
 ```
 
-See: `examples/cache_dir.py`
+See: `examples/pytorch/cache_dir.py`
 
 ---
 
@@ -308,6 +311,10 @@ ONNX models built with `groqit()` return a standard `GroqModel` instance.
 PyTorch and TorchScript models built with `groqit()` return an instance of `class PytorchModelWrapper(GroqModel)`, which is the same as a `GroqModel` except:
  - `PytorchModelWrapper` is a callable object, similar to `torch.nn.Module` (i.e., `__call__()` executes the model's forward function)
  - Tensors returned by `PytorchModelWrapper` will be of type `torch.tensor`
+
+Keras models built with `groqit()` return an instance of `class KerasModelWrapper(GroqModel)`, which is the same as a `GroqModel` except:
+ - `KerasModelWrapper` is a callable object, similar to `tf.keras.Model` (i.e., `__call__()` executes the model's call function)
+ - Tensors returned by `KerasModelWrapper` will be of type `tf.Tensor`
 
 ---
 
@@ -339,8 +346,9 @@ PyTorch and TorchScript models built with `groqit()` return an instance of `clas
 ```
 
 See:
- - `examples/hello_pytorch_world.py`
- - `examples/hello_onnx_world.py`
+ - `examples/pytorch/hello_world.py`
+ - `examples/keras/hello_world.py`
+ - `examples/onnx/hello_world.py`
 
 
 ---
@@ -349,7 +357,7 @@ See:
 
 `GroqModel` provides a method, `GroqModel.run_abunch()`, to help you run a bunch of inferences. Specifically, `run_abunch()` will iterate over a collection of inputs and run each one of them.
 
-- The argument to `run_abunch(input_collection=...)` is a list of dictionaries, where each dictionary has keys corresponding to the arguments to your PyTorch model's forward function.
+- The argument to `run_abunch(input_collection=...)` is a list of dictionaries, where each dictionary has keys corresponding to the arguments to your model's forward function.
 - *Hint*: use `run_abunch()` when the overhead of using `GroqModel.__call__()` would make it onerous to evaluate a large dataset (see our [warning about the performance](#groqmodel-methods) of `GroqModel`)
 
 ### Example:
@@ -370,7 +378,7 @@ See:
 
 ```
 
-See: `examples/run_abunch.py`
+See: `examples/pytorch/run_abunch.py`
 
 ---
 
@@ -396,7 +404,7 @@ See: `examples/run_abunch.py`
   1000
 ```
 
-See: `examples/estimate_performance.py`
+See: `examples/pytorch/estimate_performance.py`
 
 ---
 
@@ -412,7 +420,7 @@ gmodel = groqit(model, inputs)
 gmodel.netron()
 ```
 
-See: `examples/netron.py`
+See: `examples/pytorch/netron.py`
 
 ---
 
@@ -428,7 +436,7 @@ gmodel = groqit(model, inputs, groqview=True)
 gmodel.groqview()
 ```
 
-See: `examples/groqview.py`
+See: `examples/pytorch/groqview.py`
 
 ## Concepts
 
@@ -438,7 +446,7 @@ The *GroqFlow build cache* is a location on disk that holds all of the artifacts
 - Each build gets its own directory, named according to the `build_name` [argument](#setting-the-build-name), in the cache.
 - A build is considered stale (will not be loaded by default) under the following conditions:
     - The model, inputs, or arguments to `groqit()` have changed since the last successful build.
-        - Note: a common cause of builds becoming stale is when `torch` assigns random values to parameters or inputs. You can prevent the random values from changing by using `torch.manual_seed(0)`.
+        - Note: a common cause of builds becoming stale is when `torch` or `keras` assigns random values to parameters or inputs. You can prevent the random values from changing by using `torch.manual_seed(0)` or `tf.random.set_seed(0)`.
     - The major or minor version number of GroqFlow has changed, indicating a breaking change to builds.
 - The artifacts produced in each build include:
     - Build information is stored in `*_state.yaml`, where `*` is the build's name (see [The state.yaml File](#the-stateyaml-file)).

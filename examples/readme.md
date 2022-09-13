@@ -27,7 +27,7 @@ Here are some properties shared by all of the examples:
 
 - Each example will create a build directory in the GroqFlow build cache, which is located at `~/.cache/groqflow` by default.
   - **Note**: Most builds will load from this cache after the first time you run them, as opposed to rebuilding, unless otherwise specified in the example (check out the `rebuild` argument and its examples to change this behavior).
-  - **Note**: Most examples set `torch.manual_seed(0)`, unless otherwise specified in the example, which prevents the randomly generated weights in the example from changing between runs.
+  - **Note**: Most examples set `torch.manual_seed(0)` or `tf.random.set_seed(0)`, unless otherwise specified in the example, which prevents the randomly generated weights in the example from changing between runs.
 - The build directory will be named after the example unless the example specifies a name change with the `build_name` argument (see the `build_name.py` example).
 - The model being built in each example is a small one- or two-layer fully-connected graph.
 
@@ -43,10 +43,11 @@ python /path/to/example/example_name.py
 
 | **Example Name** | **Demonstrates** |
 |:--------|:-----------|
-| `hello_pytorch_world.py` | building and running a model defined in PyTorch|
-| `hello_onnx_world.py` | building and running a model defined as an ONNX file|
+| `pytorch/hello_world.py` | building and running a model defined in PyTorch|
+| `keras/hello_world.py` | building and running a model defined in Keras|
+| `onnx/hello_world.py` | building and running a model defined as an ONNX file|
 
-## Additional Examples
+## Additional PyTorch Examples in `pytorch/` Folder
 
 | **Example Name** | **Demonstrates** |
 |:--------|:-----------|

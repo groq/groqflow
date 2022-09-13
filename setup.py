@@ -21,11 +21,17 @@ setup(
         "onnxmltools==1.10.0",
         "onnxruntime==1.10.0",
         "paramiko==2.11.0",
-        "torch>=1.9.1",
+        "torch>=1.12.1",
         "protobuf==3.19.4",
         "pyyaml==6.0",
+        "tensorflow-cpu>=2.9.1",
+        "tf2onnx>=1.12.0",
         "typeguard>=2.3.13",
         "packaging",
     ],
     classifiers=[],
+    entry_points={
+        "console_scripts": [
+        ]
+    },
 )

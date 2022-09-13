@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import subprocess
 import pathlib
@@ -13,6 +14,14 @@ import groqflow.common.printing as printing
 import groqflow.common.build as build
 import groqflow.common.sdk_helpers as sdk
 import groqflow.common.tensor_helpers as tensor_helpers
+
+try:
+    import tensorflow as tf
+except ModuleNotFoundError as module_error:
+    raise exp.GroqModelEnvError(
+        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
+        "You must install tensorflow to continue."
+    )
 
 
 @dataclass
@@ -309,10 +318,17 @@ class GroqModel:
             self.state.latency_file
         )
 
-    # Models with a single output are returned as torch.tensor or np.array (see tensor_type)
-    # Models with multiple outputs are returned as a tuple of torch.tensors or np.arrays
+    # Models with a single output are returned as either a torch.tensor,
+    # tf.Tensor, or an np.array (see tensor_type)
+    # Models with multiple outputs are returned as either a tuple of
+    # torch.tensors, tf.Tensors, or np.arrays
     def _unpack_results(self, results: List[Dict], output_nodes, num_outputs):
-        unpacked_results = [self.tensor_type(results[x]) for x in output_nodes]
+        if self.tensor_type is tf.Tensor:
+            unpacked_results = [
+                tf.convert_to_tensor(results[x]) for x in output_nodes
+            ]
+        else:
+            unpacked_results = [self.tensor_type(results[x]) for x in output_nodes]
         return unpacked_results[0] if num_outputs == 1 else tuple(unpacked_results)
 
     def _unpack_results_file(self, packed_results: str) -> Any:
@@ -388,9 +404,10 @@ class GroqModel:
         try:
             # FIXME: STDOUT is only saved when the process succeeds (STDERR always saved)
             # https://git.groq.io/code/Groq/-/issues/13876
-            with open(self.log_execute_path, "w", encoding="utf-8") as f:
-                output = subprocess.check_output(cmd, stderr=f)
-                f.write(output.decode("utf-8"))
+            sys.stderr = build.Logger(self.log_execute_path)
+            output = subprocess.check_output(cmd)
+            print(output.decode("utf-8"), file=sys.stderr)
+            sys.stderr = sys.stderr.terminal
         except subprocess.CalledProcessError as e:
             # This exception will show the Traceback on the subprocess followed the message
             # "The above exception was the direct cause of the following exception" and then
@@ -449,12 +466,24 @@ class PytorchModelWrapper(GroqModel):
         return self.run(kwargs)
 
 
+class KerasModelWrapper(GroqModel):
+    def __init__(self, state):
+        tensor_type = tf.Tensor
+        super(KerasModelWrapper, self).__init__(state, tensor_type)
+
+    # Keras models are callable
+    def __call__(self, **kwargs):
+        return self.run(kwargs)
+
+
 def load(build_name: str, cache_dir=build.DEFAULT_CACHE_DIR) -> GroqModel:
 
     state = build.load_state(cache_dir=cache_dir, build_name=build_name)
 
     if state.model_type == build.ModelType.PYTORCH:
         return PytorchModelWrapper(state)
+    elif state.model_type == build.ModelType.KERAS:
+        return KerasModelWrapper(state)
     else:
         return GroqModel(state)
 
