@@ -29,7 +29,7 @@ The following tasks are required to enable running proof point scripts:
 - Set up and activate a `groqflow` environment
   - Follow the [GroqFlow Installation Guide](https://github.com/groq/groqflow/blob/main/docs/install.md)
 - Pip install the helper files for the proof points
-  - `pip install -e {path_to}/groqflow/proof_points/demo_helpers`
+  - `pip install -e {path_to}/groqflow/demo_helpers`
 
 ## Support Matrices
 
