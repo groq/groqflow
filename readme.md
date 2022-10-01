@@ -39,6 +39,6 @@ To Groq a PyTorch model, simply provide your model and inputs to the `groqit()` 
 
 * [proof_points](proof_points/): Machine learning proof points using GroqFlow.
 
-* readme.md
+* [readme.md](readme.md): This readme.
 
-* setup.py
+* [setup.py](setup.py): GroqFlow setup script for installation.

@@ -46,8 +46,8 @@ export PYTHONPATH="/opt/groq/runtime/site-packages:$PYTHONPATH"
 
 ### Step 4: Rock-It with groqit()
 
-To confirm that you're setup correctly, navigate to the examples folder at `groqflow/examples/` and run the `hello_pytorch_world.py` example:
+To confirm that you're setup correctly, navigate to the examples folder at `groqflow/examples/` and run the `hello_world.py` example that can be found in the `keras`, `onnx`, and `pytorch` folder depending on your preferred framework:
 
 ```
-python hello_pytorch_world.py
+python hello_world.py
 ```

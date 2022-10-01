@@ -9,7 +9,7 @@ M5's Keyword Spotting accuracy is evaluated using the [SpeechCommands dataset](h
 ## Prerequisites
 
 - Ensure you've completed the install prerequisites:
-  - Installed the GroqWare Suite
+  - Installed the GroqWare™ Suite
   - Installed GroqFlow
   - Installed Groq Demo Helpers
     - For more information on these steps, see the [Proof Points README](../../README.md).

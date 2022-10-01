@@ -145,19 +145,18 @@ def validate_groqapi(
     return version_is_valid(version, required, "Groq API", exception_type, hint)
 
 
-# Check if we are inside the Groq Repo
-def _inside_repo():
-
+# Return the result of bake groot
+def _bake_groot():
     p = subprocess.Popen(
         ["bake", "groot"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    stdout, _ = p.communicate()
-    stdout = stdout.decode("utf-8").split()
+    repo, err = p.communicate()
+    repo = repo.decode("utf-8")
+    err = err.decode("utf-8")
 
-    # Bake groqroot returns exactly one line if successful
-    return len(stdout) == 1
+    return repo, err
 
 
 def validate_bake():
@@ -165,14 +164,26 @@ def validate_bake():
         raise exp.GroqitEnvError(
             (
                 "Bake must be available when the env var "
-                '{groqflow.common.build.environment_variables["dont_use_sdk"]} is set to TRUE'
+                f'{build.environment_variables["dont_use_sdk"]} is set to True'
             )
         )
-    elif not _inside_repo():
+
+    repo, err = _bake_groot()
+
+    if err and repo:
         raise exp.GroqitEnvError(
             (
-                "You must be inside the Groq repo when the env var"
-                '{groqflow.common.build.environment_variables["dont_use_sdk"]} is set to TRUE'
+                "You must be inside the Groq repo when the env var "
+                f'{build.environment_variables["dont_use_sdk"]} is set to True. '
+                f"groqit() detected you are inside repo {repo}"
+            )
+        )
+
+    if err:
+        raise exp.GroqitEnvError(
+            (
+                "You must be inside the Groq repo when the env var "
+                f'{build.environment_variables["dont_use_sdk"]} is set to True'
             )
         )
 

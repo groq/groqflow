@@ -7,7 +7,7 @@ In this proof point a pre-trained BERT-tiny model, fine-tuned on the [Stanford S
 ## Prerequisites
 
 - Ensure you've completed the install prerequisites:
-  - Installed the GroqWare Suite
+  - Installed GroqWare™ Suite
   - Installed GroqFlow
   - Installed Groq Demo Helpers
     - For more information on these steps, see the [Proof Points README](../../README.md).

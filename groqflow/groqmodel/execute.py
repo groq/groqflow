@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # Each example may contain one or more arguments
 
     # Parse Inputs
-    parser = argparse.ArgumentParser(description="Execute models build by GroqFlow")
+    parser = argparse.ArgumentParser(description="Execute models built by GroqFlow")
     parser.add_argument(
         "num_chips",
         type=int,
