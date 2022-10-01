@@ -19,6 +19,7 @@ def groqit(
     groqview: bool = False,
     sequence: Optional[List[stage.GroqitStage]] = None,
 ) -> groqmodel.GroqModel:
+
     """Use GroqFlow to build a model instance into a GroqModel
         object that can be executed on GroqChip processors.
 
@@ -56,7 +57,6 @@ def groqit(
         sequence: Override groqit's default sequence of build stages. Power
             users only.
     """
-
     # Validate and lock in the groqit() config (user arguments that
     # configure the build) that will be used by the rest of groqit()
     (config, auto_name) = ignition.lock_config(

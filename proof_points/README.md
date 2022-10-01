@@ -29,9 +29,9 @@ The following tasks are required to enable running proof point scripts:
 - Set up and activate a `groqflow` environment
   - Follow the [GroqFlow Installation Guide](https://github.com/groq/groqflow/blob/main/docs/install.md)
 - Pip install the helper files for the proof points
-  - `pip install -e {path_to}/groqflow/proof_points/demo_helpers`
+  - `pip install -e {path_to}/groqflow/demo_helpers`
 
-## Support Matrices
+## Support Matrix
 
 The following relates the proof point models with the version of the GroqWare Suite (SDK) in which they are supported.
 
@@ -39,6 +39,9 @@ The following relates the proof point models with the version of the GroqWare Su
 
 | Proof Point Model | Supported SDK Version(s)|
 |:------------------|:------------------------|
+| [DeiT-tiny](computer_vision/deit/) | 0.9.0
+| [GoogleNet](computer_vision/googlenet/) | 0.9.0
+| [MobileNetV2](computer_vision/mobilenetv2/) | 0.9.0
 | [SqueezeNet](computer_vision/squeezenet/) | 0.9.0
 
 ### Natural Language Processing
@@ -46,6 +49,10 @@ The following relates the proof point models with the version of the GroqWare Su
 | Proof Point Model | Supported SDK Version(s)|
 |:------------------|:------------------------|
 | [Bert Tiny](natural_language_processing/bert_tiny/) | 0.9.0
+| [DistilBERT](natural_language_processing/distilbert/) | 0.9.0
+| [ELECTRA](natural_language_processing/electra/) | 0.9.0
+| [MiniLM v2](natural_language_processing/minilm/) | 0.9.0
+| [RoBERTa](natural_language_processing/roberta/) | 0.9.0
 
 ### Speech Processing
 

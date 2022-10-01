@@ -15,6 +15,9 @@ def assembler_multichip(topology, compile_dir):
         "DF_A14_2_CHIP": g.TopologyConfig.DF_A14_2_CHIP,
         "DF_A14_4_CHIP": g.TopologyConfig.DF_A14_4_CHIP,
         "DF_A14_8_CHIP": g.TopologyConfig.DF_A14_8_CHIP,
+        "DF_A14_16_CHIP": g.TopologyConfig.DF_A14_16_CHIP,
+        "DF_A14_32_CHIP": g.TopologyConfig.DF_A14_32_CHIP,
+        "DF_A14_64_CHIP": g.TopologyConfig.DF_A14_64_CHIP,
         "FC2_A11_2_CHIP": g.TopologyConfig.FC2_A11_2_CHIP,
         "FC2_A11_4_CHIP": g.TopologyConfig.FC2_A11_4_CHIP,
     }

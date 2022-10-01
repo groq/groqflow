@@ -108,7 +108,7 @@ class ReceiveOnnxModel(stage.GroqitStage):
             """
             raise exp.GroqitStageError(msg)
 
-        shutil.move(state.model, state.base_onnx_file)
+        shutil.copy(state.model, state.base_onnx_file)
 
         # Save inputs and convert to fp16 and int32 (no int64 nor float32/64)
         tensor_helpers.save_inputs([state.inputs], state.original_inputs_file)

@@ -29,7 +29,7 @@ class GroqitEnvError(GroqFlowError):
 
 class GroqitArgError(GroqFlowError):
     """
-    Indicates to the user that they provided arguments to
+    Indicates to the user that they provided invalid arguments to
     groqit()
     """
 
@@ -74,7 +74,7 @@ class GroqModelRuntimeError(GroqFlowError):
 
 class GroqModelArgError(GroqFlowError):
     """
-    Indicates to the user that they provided arguments to
+    Indicates to the user that they provided invalid arguments to
     GroqModel()
     """
 

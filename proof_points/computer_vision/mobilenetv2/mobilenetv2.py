@@ -1,7 +1,9 @@
 """
-The following example takes a pre-trained SqueezeNet model and
-executes against the Imagenette dataset on a CPU and GroqChip™ processor
-by using the GroqFlow toolchain.
+The following example takes a pre-trained MobileNetV2 model from
+https://pytorch.org/hub/pytorch_vision_mobilenet_v2/, and
+executes against the 10-class, sampled ImageNet dataset, Imagenette
+(https://github.com/fastai/imagenette) on CPU and GroqChip™
+processor by using the GroqFlow toolchain.
 """
 
 import torch
@@ -11,22 +13,23 @@ from demo_helpers.args import parse_args
 from groqflow import groqit
 
 
-def evaluate_squeezenet(rebuild_policy=None, should_execute=None):
+def evaluate_mobilenetv2(rebuild_policy=None, should_execute=None):
     # set seed for consistency
     torch.manual_seed(0)
 
     # load torch model
     torch_model = torch.hub.load(
         "pytorch/vision:v0.10.0",
-        "squeezenet1_0",
-        weights="SqueezeNet1_0_Weights.DEFAULT",
+        "mobilenet_v2",
+        weights="MobileNet_V2_Weights.IMAGENET1K_V1",
     )
+    torch_model.eval()  # disable normalization and dropout layers
 
-    # create dummy inputs to prime groq model
+    # create dummy input to prime groq model
     dummy_inputs = torch.randn((1, 3, 224, 224), dtype=torch.float32)
 
     # generate groq model
-    build_name = "squeezenet"
+    build_name = "mobilenetv2"
     groq_model = groqit(
         torch_model,
         {"x": dummy_inputs},
@@ -42,4 +45,4 @@ def evaluate_squeezenet(rebuild_policy=None, should_execute=None):
 
 
 if __name__ == "__main__":
-    evaluate_squeezenet(**parse_args())
+    evaluate_mobilenetv2(**parse_args())

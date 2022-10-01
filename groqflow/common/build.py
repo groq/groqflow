@@ -21,9 +21,6 @@ except ModuleNotFoundError as module_error:
     )
 
 
-DEFAULT_ONNX_OPSET = 13
-MINIMUM_ONNX_OPSET = 11
-
 UnionValidModelInstanceTypes = Union[
     None,
     str,
@@ -38,13 +35,23 @@ class Groqcard(enum.Enum):
     A11 = "A1.1"
 
 
+# WARNING: The "internal" env var may cause unexpected behavior if enabled
+# outside of the internal Groq dev environment.
 environment_variables = {
     "cache_dir": "GROQFLOW_CACHE_DIR",
     "rebuild": "GROQIT_REBUILD_POLICY",
     "dont_use_sdk": "GROQFLOW_BAKE_SDK",
     "target_a11": "GROQFLOW_LEGACY_A11",
     "debug": "GROQFLOW_DEBUG",
+    "internal": "GROQFLOW_INTERNAL_FEATURES",
 }
+
+# TODO: remove this check after SDK 0.9.1 releases
+if os.environ.get(environment_variables["internal"]) == "True":
+    DEFAULT_ONNX_OPSET = 14
+else:
+    DEFAULT_ONNX_OPSET = 13
+MINIMUM_ONNX_OPSET = 11
 
 # Allow an environment variable to override the default
 # location for the GroqFlow build cache
@@ -100,7 +107,10 @@ class ModelType(enum.Enum):
 
 
 def supported_topology(groqcard: Groqcard):
-    return [1, 2, 4] if groqcard == Groqcard.A11 else [1, 2, 4, 8]
+    if os.environ.get(environment_variables["internal"]) == "True":
+        return [1, 2, 4] if groqcard == Groqcard.A11 else [1, 2, 4, 8, 16, 32, 64]
+    else:
+        return [1, 2, 4] if groqcard == Groqcard.A11 else [1, 2, 4, 8]
 
 
 def max_chips(groqcard: Groqcard):
@@ -108,7 +118,7 @@ def max_chips(groqcard: Groqcard):
 
 
 # Each chip can hold approximately 50M parameters
-# Number of chips need to be either 1, 2, 4 or 8
+# Number of chips need to be either 1, 2, 4, 8, 16, 32 or 64
 def calculate_num_chips(num_parameters, estimate=False):
     if num_parameters is not None:
         if num_parameters == 0:
@@ -425,6 +435,9 @@ class State:
             2: "DF_A14_2_CHIP",
             4: "DF_A14_4_CHIP",
             8: "DF_A14_8_CHIP",
+            16: "DF_A14_16_CHIP",
+            32: "DF_A14_32_CHIP",
+            64: "DF_A14_64_CHIP",
         }
         topo_a11 = {
             1: "n/a",
@@ -455,7 +468,6 @@ class State:
         # Special case for saving objects
         state_dict["config"] = copy.deepcopy(vars(self.config))
         state_dict["info"] = copy.deepcopy(vars(self.info))
-
         state_dict["config"]["groqcard"] = self.config.groqcard.value
 
         state_dict["model_type"] = self.model_type.value

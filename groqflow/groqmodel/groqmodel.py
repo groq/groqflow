@@ -295,6 +295,16 @@ class GroqModel:
                 f"Expected arg input_collection to be a list but received {type(input_collection)}."
             )
 
+        # GroqFlow currently allows 8+ chips models to be built only when GroqFlow's internal
+        # features are enabled. Executing 8+ chips models is not currently supported by GroqFlow.
+        if self.state.num_chips_used > 8:
+            msg = (
+                f"Groqit's num_chips_used was set to {self.state.num_chips_used}, "
+                "but the current runtime only allows for up to 8 GroqChips."
+            )
+
+            raise exp.GroqFlowError(msg)
+
         # Save inputs to file
         tensor_helpers.save_inputs(input_collection, self.state.execution_inputs_file)
 
@@ -308,7 +318,7 @@ class GroqModel:
 
         # Select execution script according to backend
         if self._select_backend() == build.Backend.CLOUD:
-            cloud.execute_remotely(
+            cloud.execute_groqchip_remotely(
                 bringup_topology, repetitions, self.state, self.log_execute_path
             )
         else:
@@ -431,7 +441,7 @@ class GroqModel:
             groqview_path = [
                 "bake",
                 "r",
-                "//Groq/View/Bind/Server:groqview",
+                "//Groq/View/Server:groqview",
             ]
 
         # Check if the groqview file exists
@@ -477,7 +487,6 @@ class KerasModelWrapper(GroqModel):
 
 
 def load(build_name: str, cache_dir=build.DEFAULT_CACHE_DIR) -> GroqModel:
-
     state = build.load_state(cache_dir=cache_dir, build_name=build_name)
 
     if state.model_type == build.ModelType.PYTORCH:

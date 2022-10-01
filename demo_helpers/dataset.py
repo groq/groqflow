@@ -343,7 +343,7 @@ class ImagenetteDataset(Dataset):
         num_examples: Optional[int] = None,
     ) -> None:
         """
-        A sampled version of the ImageNet dataset containing only 10 classes.
+        A sampled version of the Imagenet dataset containing only 10 classes.
 
         Original source from fast.ai here: https://github.com/fastai/imagenette
         """
