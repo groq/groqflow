@@ -60,9 +60,6 @@ if os.environ.get(environment_variables["cache_dir"]):
 else:
     DEFAULT_CACHE_DIR = os.path.expanduser("~/.cache/groqflow")
 
-# Download torch model weights to groqflow cache in processes that use this file.
-torch.hub.set_dir(os.path.join(DEFAULT_CACHE_DIR, "torch/hub"))
-
 # Allow an environment variable to override the default
 # rebuild policy
 if os.environ.get(environment_variables["rebuild"]):
