@@ -486,9 +486,27 @@ class ConvertOnnxToFp16(stage.GroqitStage):
         input_onnx = state.intermediate_results[0]
 
         # Convert the model to FP16
+
+        # Some ops will not be converted to fp16 because they are in a block list
+        # The latest list can be found here. It is not neccesarily the list that
+        # our version of onnxmltools sees
+        # https://github.com/microsoft/onnxconverter-common/blob/master/onnxconverter_common/float16.py#L82
+
+        # Legalize ops are ops that have been or are currently in the block list
+        # that we explicitly want removed
+        legalize_ops = ["InstanceNormalization", "Resize"]
+        op_block_list = (
+            onnxmltools.utils.float16_converter.DEFAULT_OP_BLOCK_LIST.copy()
+        )
+        for op in legalize_ops:
+            # Check to see that they are not in the block list before we remove them
+            # Neccesary because the block list may be updated, and not in the state we expect
+            if op in op_block_list:
+                op_block_list.remove(op)
+
         fp32_model = onnx.load_model(input_onnx)
         fp16_model = onnxmltools.utils.float16_converter.convert_float_to_float16(
-            fp32_model,
+            fp32_model, op_block_list=op_block_list
         )
 
         # Save F16 model

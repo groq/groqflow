@@ -7,9 +7,22 @@ import re
 import subprocess
 import shutil
 from typing import Type, Union
-import pkg_resources
-import groqflow.common.exceptions as exp
+from pkg_resources import (
+    DistributionNotFound,
+    get_distribution,
+    parse_version,
+)
 import groqflow.common.build as build
+import groqflow.common.exceptions as exp
+import groqflow.common.printing as printing
+
+
+# Older than min release version fails
+# Not equal to current release version is unsupported and warns
+# but may still work
+MIN_RELEASE_VERSION = "0.9.0"
+CURRENT_RELEASE_VERSION = "0.9.0"
+VALID_VERSIONS = [CURRENT_RELEASE_VERSION, "test"]
 
 
 def get_num_chips_available(pci_devices=None):
@@ -86,13 +99,8 @@ def version_is_valid(
     exception_type: Type[Exception] = exp.GroqitEnvError,
     hint: str = "",
 ) -> bool:
-
-    # TODO: update this logic once more versions are valid
-    valid_release_version = "0.9.0"
-    valid_test_version = "test"
-
     msg = (
-        f"{requirement_name} {valid_release_version} is a required dependence "
+        f"{requirement_name}>={MIN_RELEASE_VERSION} is a required dependency "
         "for this part of GroqFlow"
     )
 
@@ -104,15 +112,25 @@ def version_is_valid(
         else:
             return False
     # Package found, but version is not acceptable
-    elif sdkv != valid_release_version and sdkv != valid_test_version:
+    elif sdkv not in VALID_VERSIONS:
         if required:
-            msg = msg + f" ({sdkv} is installed). "
-            raise exception_type(msg + hint)
+            if parse_version(sdkv) < parse_version(MIN_RELEASE_VERSION):
+                msg = msg + f" ({sdkv} is installed). "
+                raise exception_type(msg + hint)
+            else:
+                msg = (
+                    "This version of Groqflow is only officially supported with "
+                    f"{requirement_name}=={CURRENT_RELEASE_VERSION} but the installed "
+                    f"{requirement_name} is version {sdkv}. This may still work but "
+                    f"ensure you are using {CURRENT_RELEASE_VERSION} before "
+                    "opening a support ticket."
+                )
+                printing.log_warning(msg)
         else:
             return False
-    # Package found and has the right version
-    else:
-        return True
+
+    # Package found and has a valid version
+    return True
 
 
 def validate_devtools(
@@ -135,8 +153,8 @@ def validate_groqapi(
     required=False, exception_type: Type[Exception] = exp.GroqitEnvError
 ) -> Union[bool, str]:
     try:
-        version = pkg_resources.get_distribution("groq").version
-    except pkg_resources.DistributionNotFound:
+        version = get_distribution("groq").version
+    except DistributionNotFound:
         version = False
     hint = (
         "Make sure to install groq-devtools and "

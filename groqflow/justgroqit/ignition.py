@@ -517,7 +517,7 @@ def _load_model_from_file(path_to_model, user_inputs):
         msg = f"""
         groqit() received a model argument that was a string. However, model string
         arguments are required to be a path to either a .py or .onnx file, and the
-        following argument is neither: {model}
+        following argument is neither: {path_to_model}
         """
         raise exp.GroqitIntakeError(msg)
 

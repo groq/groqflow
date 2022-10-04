@@ -2,6 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
+import numpy as np
+import onnxruntime
 from prettytable import PrettyTable
 from tqdm import tqdm
 import torch
@@ -23,7 +25,6 @@ def generate_result_comparison_table(
 ) -> List[Tuple]:
     pretty_table = PrettyTable()
     row_data = []
-    y_test = dataset.y
 
     score_label = resolve_score_label(task)
     pretty_table.field_names = [
@@ -32,8 +33,11 @@ def generate_result_comparison_table(
     ]
 
     for performance in performance_result:
-        prediction = torch.stack(performance.predictions).numpy()
-        score = formatted_score(prediction, y_test, inputs=dataset.x, task=task)
+        if isinstance(performance.predictions[0], torch.Tensor):
+            prediction = torch.stack(performance.predictions).numpy()
+        else:
+            prediction = np.concatenate(performance.predictions, axis=0)
+        score = formatted_score(prediction, dataset, task=task)
         row_data.append(
             (
                 performance.name,
@@ -69,11 +73,11 @@ def compute_performance(
     )
 
     groq_performance_result = timed_inference_end_to_end_latency(
-        dataset.x, groq_model, chip_type="groq", task=task
+        dataset, groq_model, chip_type="groq", task=task
     )
 
     host_performance_result = timed_inference_end_to_end_latency(
-        dataset.x, pytorch_model, chip_type="cpu"
+        dataset, pytorch_model, chip_type="cpu"
     )
 
     result_table = generate_result_comparison_table(
@@ -82,9 +86,9 @@ def compute_performance(
     return result_table
 
 
-def groq_model_inference(x, model, task: Optional[str] = None):
+def groq_model_inference(dataset, model, task: Optional[str] = None):
     print("Running inference on GroqChip.")
-    pred = model.run_abunch(x)
+    pred = model.run_abunch(dataset.x)
     if isinstance(pred, torch.Tensor):
         pred = [pred]
 
@@ -93,14 +97,27 @@ def groq_model_inference(x, model, task: Optional[str] = None):
             pred = [p[0] for p in pred]
         else:
             pred = list(map(torch.vstack, pred))
-    return pred
+    return dataset.postprocess(pred)
 
 
-def pytorch_model_inference(x, model):
+def onnx_model_inference(dataset, model):
+    print("Running inference on CPU (ONNX).")
+    session = onnxruntime.InferenceSession(model)
+    result = []
+    for inputs in tqdm(dataset.x):
+        out = session.run(None, inputs)
+        if len(out) == 1:
+            result.append(torch.tensor(out[0]))
+        else:
+            result.append(tuple([torch.tensor(out[i]) for i in range(len(out))]))
+    return dataset.postprocess(result)
+
+
+def pytorch_model_inference(dataset, model):
     pred = []
     with torch.no_grad():
         print("Running inference using PyTorch model (CPU).")
-        for inputs in tqdm(x):
+        for inputs in tqdm(dataset.x):
             out = model(**inputs)
             if not isinstance(out, torch.Tensor):
                 if "logits" in out:
@@ -114,20 +131,23 @@ def pytorch_model_inference(x, model):
                         "Unknown output key. List of keys:", list(out.keys())
                     )
             pred.append(out)
-    return pred
+    return dataset.postprocess(pred)
 
 
 def timed_inference_end_to_end_latency(
-    x, model, chip_type: str, task: Optional[str] = None
+    dataset, model, chip_type: str, task: Optional[str] = None
 ) -> PerformanceResult:
     if chip_type == "groq":
-        result = groq_model_inference(x, model, task)
+        result = groq_model_inference(dataset, model, task)
     elif chip_type == "cpu":
-        result = pytorch_model_inference(x, model)
+        if isinstance(model, str):  # ONNX
+            result = onnx_model_inference(dataset, model)
+        else:
+            result = pytorch_model_inference(dataset, model)
 
     return PerformanceResult(
         name=chip_type,
         batch_size=1,
-        total_number_of_samples=len(x),
+        total_number_of_samples=len(dataset.x),
         predictions=result,
     )

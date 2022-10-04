@@ -17,10 +17,11 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageNet
+from torchvision.ops import box_convert, nms
 import torchvision.transforms as T
 from tqdm import tqdm
-from path import Path
 from groqflow.common.build import DEFAULT_CACHE_DIR
+from demo_helpers.misc import suppress_stdout
 
 
 GROQFLOW_DATASETS_PATH = os.path.join(DEFAULT_CACHE_DIR, "datasets")
@@ -46,7 +47,7 @@ MODELNET10_URL = (
 MODELNET10_PATH = os.path.join(GROQFLOW_DATASETS_PATH, "ModelNet10")
 
 
-random.seed = 42
+random.seed(42)
 
 
 def zero_pad(data, length=None):
@@ -86,6 +87,9 @@ class Dataset(ABC):
     @abstractmethod
     def preprocess(self):
         pass
+
+    def postprocess(self, output):
+        return output
 
 
 class BasicDataset(Dataset):
@@ -652,11 +656,11 @@ class PointCloudDataset(Dataset):
     def __init__(self, name: str, num_examples: Optional[int] = None) -> None:
         super().__init__(name)
         self.num_examples = num_examples
-        root_dir = Path(self._download_dataset())
+        root_dir = self._download_dataset()
         folders = [
             dir
             for dir in sorted(os.listdir(root_dir))
-            if os.path.isdir(root_dir / dir)
+            if os.path.isdir(os.path.join(root_dir, dir))
         ]
         self.classes = {folder: i for i, folder in enumerate(folders)}
         self.transforms = T.Compose(
@@ -671,11 +675,11 @@ class PointCloudDataset(Dataset):
 
         self.files = []
         for category in self.classes.keys():
-            new_dir = root_dir / Path(category) / "test"
+            new_dir = os.path.join(root_dir, category, "test")
             for file in os.listdir(new_dir):
                 if file.endswith(".off"):
                     sample = {}
-                    sample["pcd_path"] = new_dir / file
+                    sample["pcd_path"] = os.path.join(new_dir, file)
                     sample["category"] = category
                     self.files.append(sample)
 
@@ -733,30 +737,192 @@ class PointCloudDataset(Dataset):
         return MODELNET10_PATH
 
     def _validate_data(self, modelnet10_path):
-        root_dir = Path(modelnet10_path)
+        root_dir = modelnet10_path
 
         # Ensure there are 10 class folders
         folders = [
             dir
             for dir in sorted(os.listdir(root_dir))
-            if os.path.isdir(root_dir / dir)
+            if os.path.isdir(os.path.join(root_dir, dir))
         ]
         if len(folders) != 10:
             return False
 
         # Ensure every class has a test folder
         for folder in folders:
-            test_dir = root_dir / folder / "test"
+            test_dir = os.path.join(root_dir, folder, "test")
             if not os.path.exists(test_dir):
                 return False
 
         # Ensure >= 50 test samples per classes
         for folder in folders:
-            test_dir = root_dir / folder / "test"
+            test_dir = os.path.join(root_dir, folder, "test")
             if len(os.listdir(test_dir)) < 50:
                 return False
 
         return True
+
+
+class CocoTransform:
+    def __init__(self, target_size):
+        self.target_size = target_size
+
+    def __call__(self, img):
+        import cv2
+
+        cv_img = np.array(img)
+
+        h0, w0 = cv_img.shape[:2]
+        r = self.target_size / max(h0, w0)
+        if r != 1:
+            cv_img = cv2.resize(
+                cv_img,
+                (int(w0 * r), int(h0 * r)),
+                interpolation=cv2.INTER_AREA if r < 1 else cv2.INTER_LINEAR,
+            )
+            h0, w0 = cv_img.shape[:2]
+
+        top = (self.target_size - h0) // 2
+        bottom = self.target_size - h0 - top
+        left = (self.target_size - w0) // 2
+        right = self.target_size - w0 - left
+
+        cv_img = cv2.copyMakeBorder(
+            cv_img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(0, 0, 0)
+        )
+        cv_img = cv_img.transpose((2, 0, 1)) / 255
+        return torch.tensor(cv_img).float()
+
+    def __repr__(self):
+        return f"CocoTransform({self.target_size})"
+
+
+class COCODataset(Dataset):
+    def __init__(self, target_size=640):
+        super().__init__("coco")
+        self.dataset_path = os.path.join(GROQFLOW_DATASETS_PATH, "coco")
+        self.anno_path = os.path.join(
+            self.dataset_path, "annotations/instances_val2017.json"
+        )
+        self.imgs_path = os.path.join(self.dataset_path, "val2017")
+        self._download_dataset()
+
+        from torchvision.datasets.coco import CocoDetection
+
+        transform = CocoTransform(target_size)
+        with suppress_stdout():
+            self.coco = CocoDetection(
+                self.imgs_path, self.anno_path, transform=transform
+            )
+        self.x = self.preprocess()
+        self.y = None
+        self.target_size = target_size
+
+        skip_classes = set([0, 12, 26, 29, 30, 45, 66, 68, 69, 71, 83])
+        self.class_conversion_map = [i for i in range(91) if i not in skip_classes]
+
+    def _validate_dataset(self):
+        if not os.path.exists(self.anno_path):
+            return False
+
+        if not os.path.exists(self.imgs_path):
+            return False
+
+        if len(os.listdir(self.imgs_path)) != 5000:
+            return False
+        return True
+
+    def _download_dataset(self):
+        if self._validate_dataset():
+            return
+        os.makedirs(self.dataset_path, exist_ok=True)
+
+        base_url = "http://images.cocodataset.org"
+        anno_url = f"{base_url}/annotations/annotations_trainval2017.zip"
+        imgs_url = f"{base_url}/zips/val2017.zip"
+
+        anno_zip = cached_path(anno_url)
+        imgs_zip = cached_path(imgs_url)
+
+        with zipfile.ZipFile(anno_zip, "r") as f:
+            f.extractall(self.dataset_path)
+
+        with zipfile.ZipFile(imgs_zip, "r") as f:
+            f.extractall(self.dataset_path)
+
+    def preprocess(self):
+        return [
+            {"image_arrays": self.coco[i][0].unsqueeze(0).numpy()}
+            for i in range(len(self.coco))
+        ]
+
+    def non_max_suppression(self, prediction):
+        if len(prediction) == 0 or len(prediction[0]) == 0:
+            return np.zeros((0, 6))
+
+        conf_thres = 0.03
+        iou_thres = 0.65
+        max_det = 300
+
+        x = prediction[0]
+        x[:, 5:] *= x[:, 4:5]
+        conf, class_idx = x[:, 5:].max(axis=1, keepdim=True)
+        mask = (conf > conf_thres).view(-1)
+        x = x[mask]
+        class_idx = class_idx[mask].float()
+        conf = conf[mask]
+        if len(x) == 0:
+            return np.zeros((0, 6))
+        boxes = box_convert(x[:, :4], "cxcywh", "xyxy")
+        x = torch.cat((boxes, conf, class_idx), 1)
+
+        # Add offsets nms is done separately for each class
+        offset_boxes = boxes + class_idx * 4096
+        keep_idx = nms(offset_boxes, conf.view(-1).float(), iou_thres)
+        keep_idx = keep_idx[:max_det]
+        return x[keep_idx]
+
+    def _postprocess_single(self, output, image_id, img_meta):
+        if not isinstance(output, torch.Tensor):
+            output = torch.tensor(output)
+        output = self.non_max_suppression(output)
+        if len(output) == 0:
+            return np.zeros((0, 7))
+        src_h, src_w = img_meta["height"], img_meta["width"]
+        scale = self.target_size / (max(src_h, src_w))
+        w_pad = (self.target_size - round(src_w * scale)) // 2
+        h_pad = (self.target_size - round(src_h * scale)) // 2
+
+        output[:, 0].sub_(w_pad)
+        output[:, 1].sub_(h_pad)
+        output[:, 2].sub_(w_pad)
+        output[:, 3].sub_(h_pad)
+
+        output[:, :4].div_(scale)
+
+        output[:, 0].clamp_(0, src_w)
+        output[:, 1].clamp_(0, src_h)
+        output[:, 2].clamp_(0, src_w)
+        output[:, 3].clamp_(0, src_h)
+
+        boxes = box_convert(output[:, :4], "xyxy", "xywh")
+        n = output.shape[0]
+
+        out = np.zeros((n, 7))
+        out[:, 0] = image_id
+        out[:, 1:5] = boxes
+        out[:, 5] = output[:, 4]
+        out[:, 6] = [self.class_conversion_map[int(output[i][5])] for i in range(n)]
+        return out
+
+    def postprocess(self, outputs):
+        results = []
+        for i, output in enumerate(outputs):
+            img_id = self.coco.ids[i]
+            results.append(
+                self._postprocess_single(output, img_id, self.coco.coco.imgs[img_id])
+            )
+        return results
 
 
 def create_dataset(
@@ -788,5 +954,7 @@ def create_dataset(
         return SpeechCommandsDataset(name)
     elif name == "point_cloud":
         return PointCloudDataset(name)
+    elif name == "coco":
+        return COCODataset()
     else:
         raise ValueError("Unknown dataset: " + name)

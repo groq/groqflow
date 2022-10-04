@@ -9,14 +9,14 @@ import torch.nn.functional as F
 from sklearn.metrics.pairwise import paired_cosine_distances
 from scipy.stats import spearmanr
 
+from demo_helpers.misc import suppress_stdout
 
-def formatted_score(
-    pred, test, ids=None, tokenizer=None, inputs=None, task="classification"
-):
-    sc = score(pred, test, ids=ids, tokenizer=tokenizer, inputs=inputs, task=task)
+
+def formatted_score(pred, dataset, ids=None, tokenizer=None, task="classification"):
+    sc = score(pred, dataset, ids=ids, tokenizer=tokenizer, task=task)
     if task in ["classification", "qa", "ner", "keyword_spotting"]:
         sc = f"{sc:.2%}"
-    elif task in ["regression", "sentence_similarity"]:
+    elif task in ["regression", "sentence_similarity", "coco_map"]:
         sc = f"{sc:.4f}"
     elif task == "semantic_segmentation":
         sc = sc["mean_iou"]
@@ -72,7 +72,8 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     return max(scores_for_ground_truths)
 
 
-def score(pred, test, ids=None, tokenizer=None, inputs=None, task="classification"):
+def score(pred, dataset, ids=None, tokenizer=None, task="classification"):
+    inputs, test = dataset.x, dataset.y
     if task == "classification":
         sc = np.mean(pred.argmax(axis=-1).reshape(test.shape) == test)
     elif task == "keyword_spotting":
@@ -116,6 +117,19 @@ def score(pred, test, ids=None, tokenizer=None, inputs=None, task="classificatio
         sc = calculate_miou_score(pred, test)
     elif task == "sentence_similarity":
         sc = calculate_spearman_correlation(pred, test, inputs)
+    elif task == "coco_map":
+        # pylint: disable=import-error
+        from pycocotools.coco import COCO
+        from pycocotools.cocoeval import COCOeval
+
+        with suppress_stdout():
+            anno = COCO(dataset.anno_path)
+            pred = anno.loadRes(pred)
+            cocoEval = COCOeval(anno, pred, "bbox")
+            cocoEval.evaluate()
+            cocoEval.accumulate()
+            cocoEval.summarize()
+            sc = cocoEval.stats[0]
     else:
         raise Exception(f"Unrecognized task: {task}")
     return sc
@@ -132,6 +146,8 @@ def resolve_score_label(task: str) -> str:
         label = "Mean IoU"
     elif task == "sentence_similarity":
         label = "Spearman Rank Correlation Coefficient"
+    elif task == "coco_map":
+        label = "mAP @ 0.5:0.95"
     else:
         raise Exception(f"Unrecognized task: {task}")
     return label

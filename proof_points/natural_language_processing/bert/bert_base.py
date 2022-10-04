@@ -1,7 +1,8 @@
 """
-The following example takes pre-trained Bert-tiny from huggingface and
-executes against SST dataset on CPU and GroqChip™ processor using the
-GroqFlow™ toolchain.
+The following example takes pre-trained Bert from Hugging Face
+(https://huggingface.co/howey/bert-base-uncased-sst2) and
+executes against SST dataset (https://paperswithcode.com/dataset/sst)
+on CPU and GroqCard™ processor using the GroqFlow toolchain.
 """
 import os
 import numpy as np
@@ -15,7 +16,7 @@ from demo_helpers.args import parse_args
 
 def get_model():
     """PyTorch Model setup."""
-    pretrained_model_name = "M-FAC/bert-tiny-finetuned-sst2"
+    pretrained_model_name = "howey/bert-base-uncased-sst2"
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(pretrained_model_name)
     pytorch_model = transformers.AutoModelForSequenceClassification.from_pretrained(
@@ -25,7 +26,7 @@ def get_model():
     return pytorch_model.eval(), tokenizer
 
 
-def evaluate_bert_tiny(rebuild_policy=None, should_execute=True):
+def evaluate_bert(rebuild_policy=None, should_execute=True):
     # set seed for consistency
     np.random.seed(1)
     torch.manual_seed(0)
@@ -58,4 +59,4 @@ def evaluate_bert_tiny(rebuild_policy=None, should_execute=True):
 
 
 if __name__ == "__main__":
-    evaluate_bert_tiny(**parse_args())
+    evaluate_bert(**parse_args())
