@@ -504,9 +504,8 @@ class ConvertOnnxToFp16(stage.GroqitStage):
             if op in op_block_list:
                 op_block_list.remove(op)
 
-        fp32_model = onnx.load_model(input_onnx)
-        fp16_model = onnxmltools.utils.float16_converter.convert_float_to_float16(
-            fp32_model, op_block_list=op_block_list
+        fp16_model = onnxmltools.utils.float16_converter.convert_float_to_float16_model_path(
+            input_onnx, op_block_list=op_block_list
         )
 
         # Save F16 model
