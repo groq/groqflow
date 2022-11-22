@@ -16,6 +16,13 @@ def rmdir(folder):
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
 
+        shutil.rmtree(folder)
+
+        return True
+
+    else:
+        return False
+
 
 def get_all(path, exclude_path=False, file_type="state.yaml", recursive=True):
     if recursive:

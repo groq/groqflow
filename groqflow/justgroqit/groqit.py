@@ -76,7 +76,7 @@ def groqit(
         sequence_locked,
         model_type,
         corpus,
-    ) = ignition.model_intake(model, inputs, sequence)
+    ) = ignition.model_intake(model, inputs, sequence, config)
 
     # Get the state of the model from the GroqFlow cache if a valid build is available
     state = ignition.load_or_make_state(

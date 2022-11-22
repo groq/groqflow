@@ -11,7 +11,7 @@ We recommend that your system meets the following hardware requirements:
 
 ## Installation Guide
 
-Sign-up on [support.groq.com](https://support.groq.com) to download and install GroqWare™ Suite version 0.9.0.
+Sign-up on [support.groq.com](https://support.groq.com) to download and install GroqWare™ Suite version 0.9.1.
 
 For installation instructions, please have a look at our [Install Guide](docs/install.md).
 

@@ -72,6 +72,13 @@ class GroqModelRuntimeError(GroqFlowError):
     """
 
 
+class GroqModelRemoteError(GroqFlowError):
+    """
+    Let the user know that something went wrong during runtime
+    execution on the GroqCard accelerators when using remote backend.
+    """
+
+
 class GroqModelArgError(GroqFlowError):
     """
     Indicates to the user that they provided invalid arguments to

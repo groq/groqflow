@@ -103,10 +103,52 @@ def _validate_args(  # pylint: disable = unused-argument
         supported_topology = build.supported_topology(groqcard)
         if num_chips not in supported_topology:
             msg = f"""
-            You set groqit's num_chips argument to {num_chips} for build {build_name}, which is
+            You set groqit()'s num_chips argument to {num_chips} for build {build_name}, which is
             not a supported value. Choose from the currently supported chip counts: {supported_topology}.
             """
             raise exp.GroqitArgError(msg)
+
+    if compiler_flags:
+        if "--auto-asm" in compiler_flags:
+            if assembler_flags:
+                msg = """
+                The --auto-asm compiler flag is mutually exclusive with the assembler_flags argument
+                argument to groqit(). Either set assembler_flags=None or do not use --auto-asm.
+                """
+                raise exp.GroqitArgError(msg)
+
+            if num_chips is None or num_chips > 1:
+                msg = """
+                The --auto-asm compiler flag is incompatible with multi-chip models.
+                Either set num_chips=1 or do not use --auto-asm.
+                """
+                raise exp.GroqitArgError(msg)
+
+        # groqit() may automatically apply certain Groq Compiler flags to each build
+        # This check makes sure the user isn't creating a collision by also applying
+        # any of these flags
+        disallowed_compiler_flags = [
+            "--multichip",
+            "--groqview",
+            "--save-stats",
+            "-o",
+        ]
+        for user_flag in compiler_flags:
+            for disallowed_flag in disallowed_compiler_flags:
+                if user_flag.startswith(disallowed_flag):
+                    msg = f"""
+                    The following compiler flags are reserved by groqit() and cannot be used
+                    in the groqit(compiler_flags=...) argument: {disallowed_compiler_flags}.
+                    However, your compiler_flags argument includes {user_flag}.
+                    """
+                    raise exp.GroqitArgError(msg)
+
+    if assembler_flags and num_chips != 1:
+        msg = """
+        The assembler_flags argument is incompatible with multi-chip models.
+        Either set num_chips=1 or do not use assembler_flags.
+        """
+        raise exp.GroqitArgError(msg)
 
 
 def lock_config(
@@ -564,6 +606,7 @@ def model_intake(
     user_model,
     user_inputs,
     user_sequence: Optional[stage.Sequence],
+    config: build.Config,
 ) -> Tuple[Any, Any, stage.Sequence, build.ModelType, str]:
 
     # Model intake structure options:
@@ -631,6 +674,13 @@ def model_intake(
             sequence = model_type_to_sequence[model_type]
         else:
             sequence = user_sequence
+
+        if "--auto-asm" in config.compiler_flags:
+            sequence.stages = [
+                stage
+                for stage in sequence.stages
+                if not isinstance(stage, compile.Assemble)
+            ]
 
         _validate_inputs(inputs, model_dot_py_used)
 

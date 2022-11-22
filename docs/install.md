@@ -4,7 +4,8 @@ The following describes how to install GroqFlow. These instructions enable users
 
 ## Prerequisites
 
-- Download and install the GroqWare™ Suite version 0.9.0.
+- Ensure that you are using one of the following Linux distributions: Ubuntu 18.04, Ubuntu 22.04, or Rocky 8.4.
+- Download and install the GroqWare™ Suite version 0.9.1.
   - For more information, see the GroqWare Quick Start Guide at [support.groq.com](https://support.groq.com).
   - To compile your model for Groq hardware, GroqFlow requires the Groq Developer Tools Package (groq-devtools). To run your compiled model on hardware, GroqFlow requires the Groq Runtime Package (groq-runtime).
 - Clone the GroqFlow GitHub repo using the following command:
@@ -52,3 +53,21 @@ To confirm that you're setup correctly, navigate to the examples folder at `groq
 ```
 python hello_world.py
 ```
+
+### Step 5: Take-off with a Proof Point
+
+Included in the directory: `groqflow/proof_points`, are multiple examples of various machine learning and linear algebra workloads. To run these proof points, the `groqflow/demo_helpers` must be installed in your groqflow environment.
+
+```
+cd groqflow/demo_helpers/
+pip install -e .
+```
+
+### Step 6: Identify your groqit() card
+
+GroqFlow sets the GroqCard to be of type A1.4 by default. If you have a Legacy A1.1 GroqCard, run the following command before running on hardware so the multi-card workloads can properly bring up the connections between the cards:
+
+```
+export GROQFLOW_LEGACY_A11=True
+```
+
