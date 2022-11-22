@@ -37,7 +37,7 @@ The following relates the proof point models with the version of the GroqWare Su
 
 ### Computer Vision
 
-| Proof Point Model | Supported SDK Version(s)|
+| Proof Point Model | Supported SDK Version|
 |:------------------|:------------------------|
 | [DeiT-tiny](computer_vision/deit/) | 0.9.1
 | [GoogleNet](computer_vision/googlenet/) | 0.9.1
@@ -58,7 +58,7 @@ The following relates the proof point models with the version of the GroqWare Su
 
 ### Speech Processing
 
-| Proof Point Model | Supported SDK Version(s)|
+| Proof Point Model | Supported SDK Version|
 |:------------------|:------------------------|
 | [M5](speech/m5/) | 0.9.1
 
