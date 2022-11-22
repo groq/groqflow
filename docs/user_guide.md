@@ -234,6 +234,7 @@ Warning: at this time, `groqit()` does nothing to ensure that you are providing 
 **assembler_flags**
 - Provide the flags as a list of strings, i.e., `groqit(assembler_flags=["flag 1", "flag 2"], ...)`
   - *Note*: By providing flags, this overwrites the defaults flags used by GroqFlow.
+  - *Note*: Assembler flags can only be set when the `num_chips` argument is also set to 1.
 
 ### Example:
 

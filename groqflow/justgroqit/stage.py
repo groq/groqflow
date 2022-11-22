@@ -268,9 +268,24 @@ class Sequence(GroqitStage):
             """
             raise exp.GroqFlowError(msg)
 
+        # Collect telemetry for the build
+        state.info.all_build_stages = self.get_names()
+
+        # Run the build
         try:
             for stage in self.unrolled_stages:
+                # Collect telemetry about the stage
+                state.info.current_build_stage = stage.unique_name
+                start_time = time.time()
+
+                # Run the stage
                 state = stage.fire_helper(state)
+
+                # Collect telemetry about the stage
+                state.info.completed_build_stages.append(stage.unique_name)
+                state.info.build_stage_execution_times[stage.unique_name] = (
+                    time.time() - start_time
+                )
 
         except exp.GroqitStageError as e:
             # Advance the cursor below the monitor so
@@ -287,6 +302,9 @@ class Sequence(GroqitStage):
             raise
 
         else:
+            state.info.current_build_stage = None
+            # FIXME: remove this call to state.save() when #15883 is fixed
+            state.save()
             return state
 
     def status_line(self, successful, verbosity):

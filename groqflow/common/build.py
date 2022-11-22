@@ -46,11 +46,7 @@ environment_variables = {
     "internal": "GROQFLOW_INTERNAL_FEATURES",
 }
 
-# TODO: remove this check after SDK 0.9.1 releases
-if os.environ.get(environment_variables["internal"]) == "True":
-    DEFAULT_ONNX_OPSET = 14
-else:
-    DEFAULT_ONNX_OPSET = 13
+DEFAULT_ONNX_OPSET = 14
 MINIMUM_ONNX_OPSET = 11
 
 # Allow an environment variable to override the default
@@ -94,6 +90,7 @@ class Backend(enum.Enum):
     AUTO = "auto"
     LOCAL = "local"
     CLOUD = "cloud"
+    REMOTE = "remote"
 
 
 class ModelType(enum.Enum):
@@ -152,10 +149,15 @@ def state_file(cache_dir, build_name):
     return path
 
 
-def hash_model(model, model_type: ModelType):
+def hash_model(model, model_type: ModelType, hash_params: bool = True):
 
     # If the model is a path to a file, hash the file
     if model_type == ModelType.ONNX_FILE:
+        # TODO: Implement a way of hashing the models but not the parameters
+        # of ONNX inputs.
+        if not hash_params:
+            msg = "hash_params must be True for model_type ONNX_FILE"
+            raise ValueError(msg)
         if os.path.isfile(model):
             with open(model, "rb") as f:
                 file_content = f.read()
@@ -170,7 +172,10 @@ def hash_model(model, model_type: ModelType):
         hashable_params = {}
         for name, param in model.named_parameters():
             hashable_params[name] = param.data
-        hashable_model = (str(model) + str(hashable_params)).encode()
+        if hash_params:
+            hashable_model = (str(model) + str(hashable_params)).encode()
+        else:
+            hashable_model = str(model).encode()
 
         # Return hash of topology and parameters
         return hashlib.sha256(hashable_model).hexdigest()
@@ -186,7 +191,10 @@ def hash_model(model, model_type: ModelType):
         hashable_params = {}
         for layer in model.layers:
             hashable_params[layer.name] = layer.weights
-        hashable_model = (summary_str + str(hashable_params)).encode()
+        if hash_params:
+            hashable_model = (summary_str + str(hashable_params)).encode()
+        else:
+            hashable_model = summary_str.encode()
 
         # Return hash of topology and parameters
         return hashlib.sha256(hashable_model).hexdigest()
@@ -298,6 +306,13 @@ class Info:
     opset: Optional[int] = DEFAULT_ONNX_OPSET
     compiled_onnx_input_bytes: int = None
     compiled_onnx_output_bytes: int = None
+    all_build_stages: List[str] = dataclasses.field(default_factory=list)
+    current_build_stage: str = None
+    completed_build_stages: List[str] = dataclasses.field(default_factory=list)
+    build_stage_execution_times: Dict[str, float] = dataclasses.field(
+        default_factory=dict
+    )
+    compiler_ram_bytes: float = None
 
 
 @dataclasses.dataclass
@@ -391,23 +406,29 @@ class State:
         )
 
     @property
+    def onnx_dir(self):
+        return os.path.join(
+            output_dir(self.cache_dir, self.config.build_name), "onnx"
+        )
+
+    @property
     def base_onnx_file(self):
         return os.path.join(
-            output_dir(self.cache_dir, self.config.build_name),
+            self.onnx_dir,
             f"{self.config.build_name}-op{self.info.opset}-base.onnx",
         )
 
     @property
     def opt_onnx_file(self):
         return os.path.join(
-            output_dir(self.cache_dir, self.config.build_name),
+            self.onnx_dir,
             f"{self.config.build_name}-op{self.info.opset}-opt.onnx",
         )
 
     @property
     def converted_onnx_file(self):
         return os.path.join(
-            output_dir(self.cache_dir, self.config.build_name),
+            self.onnx_dir,
             f"{self.config.build_name}-op{self.info.opset}-opt-f16.onnx",
         )
 
@@ -453,6 +474,8 @@ class State:
     def save(self):
         # Create output folder if it doesn't exist
         os.makedirs(output_dir(self.cache_dir, self.config.build_name), exist_ok=True)
+        os.makedirs(self.onnx_dir, exist_ok=True)
+        os.makedirs(self.compile_dir, exist_ok=True)
 
         state_dict = {
             key: value

@@ -1,8 +1,8 @@
-import sys
+import argparse
 import groq.api as g
 
 
-def assembler_multichip(topology, compile_dir):
+def assembler_multichip(topology, compile_dir, is_large_program=False):
 
     # FIXME: topo_config is defined in two files, both assembler_multichip.py
     #  and benchmark.py. If you modify this code, make sure to modify it in
@@ -36,7 +36,17 @@ def assembler_multichip(topology, compile_dir):
 
     # if any extra instruction memory slices were defined
     # during groq-compiler add them here.
-    extra_slices = []
+    if is_large_program:
+        extra_slices = [
+            "West 18",
+            "West 19",
+            "East 17",
+            "East 18",
+            "East 19",
+            "East 38",
+        ]
+    else:
+        extra_slices = []
 
     # The .assemble method takes all the files and topologies and
     # assembles the multi chip program package.
@@ -46,17 +56,29 @@ def assembler_multichip(topology, compile_dir):
 
 if __name__ == "__main__":
 
-    # Checking if the right number of inputs has been received
-    args = sys.argv
-    expected_num_args = 3
-    if len(args) != expected_num_args:
-        print(len)
-        raise ValueError(
-            f"Wrong number of input arguments to assemble_multichip.py's main"
-            f" function: got {len(args)} but expected {expected_num_args}"
-        )
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-t",
+        dest="topology",
+        help="GroqCard topology for multi-chip assembly",
+        required=True,
+    )
+    parser.add_argument(
+        "-d",
+        dest="compile_dir",
+        help="Directory for inputs and outputs",
+        required=True,
+    )
+    parser.add_argument(
+        "-l",
+        dest="is_large_program",
+        help="If compiler uses --large-program the set to True",
+        required=False,
+        default=None,
+    )
+
+    args = parser.parse_args()
 
     # Run script
-    topology = args[1]
-    compile_dir = args[2]
-    assembler_multichip(topology, compile_dir)
+    assembler_multichip(args.topology, args.compile_dir, args.is_large_program)

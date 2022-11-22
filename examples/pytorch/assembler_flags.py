@@ -37,7 +37,10 @@ inputs = {"x": torch.rand(input_size)}
 user_provided_assembler_flags = ["--ifetch-from-self", "--no-metrics"]
 
 # Build model with user-provided assembler flags
-gmodel = groqit(pytorch_model, inputs, assembler_flags=user_provided_assembler_flags)
+# Note that assembler_flags are only allowed when num_chips=1
+gmodel = groqit(
+    pytorch_model, inputs, assembler_flags=user_provided_assembler_flags, num_chips=1
+)
 
 # Print the user-provided flags and the Groq Assembler command
 # to verify your flags were applied.

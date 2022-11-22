@@ -39,28 +39,28 @@ The following relates the proof point models with the version of the GroqWare Su
 
 | Proof Point Model | Supported SDK Version(s)|
 |:------------------|:------------------------|
-| [DeiT-tiny](computer_vision/deit/) | 0.9.0
-| [GoogleNet](computer_vision/googlenet/) | 0.9.0
-| [MobileNetV2](computer_vision/mobilenetv2/) | 0.9.0
-| [ResNet50](computer_vision/resnet50/) | 0.9.0
-| [SqueezeNet](computer_vision/squeezenet/) | 0.9.0
+| [DeiT-tiny](computer_vision/deit/) | 0.9.1
+| [GoogleNet](computer_vision/googlenet/) | 0.9.1
+| [MobileNetV2](computer_vision/mobilenetv2/) | 0.9.1
+| [ResNet50](computer_vision/resnet50/) | 0.9.1
+| [SqueezeNet](computer_vision/squeezenet/) | 0.9.1
 
 ### Natural Language Processing
 
 | Proof Point Model | Supported SDK Version(s)|
 |:------------------|:------------------------|
-| [Bert Tiny](natural_language_processing/bert/) | 0.9.0
-| [Bert Base](natural_language_processing/bert/) | 0.9.0
-| [DistilBERT](natural_language_processing/distilbert/) | 0.9.0
-| [ELECTRA](natural_language_processing/electra/) | 0.9.0
-| [MiniLM v2](natural_language_processing/minilm/) | 0.9.0
-| [RoBERTa](natural_language_processing/roberta/) | 0.9.0
+| [Bert Tiny](natural_language_processing/bert/) | 0.9.1
+| [Bert Base](natural_language_processing/bert/) | 0.9.1
+| [DistilBERT](natural_language_processing/distilbert/) | 0.9.1
+| [ELECTRA](natural_language_processing/electra/) | 0.9.1
+| [MiniLM v2](natural_language_processing/minilm/) | 0.9.1
+| [RoBERTa](natural_language_processing/roberta/) | 0.9.1
 
 ### Speech Processing
 
 | Proof Point Model | Supported SDK Version(s)|
 |:------------------|:------------------------|
-| [M5](speech/m5/) | 0.9.0
+| [M5](speech/m5/) | 0.9.1
 
 ## Running A Script
 

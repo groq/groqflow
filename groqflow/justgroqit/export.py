@@ -2,6 +2,9 @@ import os
 import inspect
 import shutil
 import re
+import warnings
+import sys
+import copy
 import torch
 import onnxruntime
 import onnxmltools
@@ -165,14 +168,15 @@ class ExportPytorchModel(stage.GroqitStage):
         # TODO: check that state.inputs is valid
         # https://git.groq.io/code/Groq/-/issues/13947
 
-        # ONNX export accepts a tuple of positional inputs followed by
-        # dict with all keyword inputs; the dict must be last item in tuple
+        # The `torch.onnx.export()` function accepts a tuple of positional inputs
+        # followed by a dictionary with all keyword inputs.
+        # The dictionary must be last item in tuple.
         user_provided_args = list(state.inputs.keys())
-        number_of_provided_args = len(user_provided_args)
 
         if isinstance(state.model, torch.nn.Module):
-            # validate user provided args
+            # Validate user provided args
             all_args = list(inspect.signature(state.model.forward).parameters.keys())
+
             for inp in user_provided_args:
                 if inp not in all_args:
                     msg = f"""
@@ -180,12 +184,29 @@ class ExportPytorchModel(stage.GroqitStage):
                     input names are: {all_args}"
                     """
                     raise ValueError(msg)
-            # if not a single input arg, pass as ({arg_name:value},)
-            if number_of_provided_args > 1:
-                dummy_inputs = (state.inputs,)
 
-            else:  # single input arg
-                dummy_inputs = tuple(state.inputs.values())
+            # Most pytorch models have args that are kind = positional_or_keyword.
+            # The `torch.onnx.export()` function accepts model args as
+            #     (all_positional_args_value,{keyword_arg:value}).
+            # To map the input_args correctly and to build an accurate model
+            # the order of the input_names must reflect the order of the model args.
+
+            # Collect order of pytorch model args.
+            all_args_order_mapping = {arg: idx for idx, arg in enumerate(all_args)}
+
+            # Sort the user provided inputs with respect to model args and store as tuple.
+            sorted_user_inputs = sorted(
+                user_provided_args, key=lambda x: all_args_order_mapping[x]
+            )
+            dummy_input_names = tuple(sorted_user_inputs)
+
+            # If a single input is provided torch.onnx.export will
+            # not accept a dictionary, so pop the first arg
+            user_args = copy.deepcopy(state.inputs)
+            first_input = user_args.pop(dummy_input_names[0])
+
+            # Create tuple: (first input, {rest of user_args dict as keyword args})
+            dummy_inputs = (first_input, user_args)
 
         # TODO: Test with optional inputs
         # https://git.groq.io/code/Groq/-/issues/14581
@@ -193,13 +214,22 @@ class ExportPytorchModel(stage.GroqitStage):
         else:  # state.model is a torch.jit.ScriptModule
             dummy_inputs = tuple(state.inputs.values())
 
-        # Collect input names
-        dummy_input_names = tuple(state.inputs.keys())
+            # Collect input names
+            dummy_input_names = tuple(state.inputs.keys())
 
         state.info.opset = build.DEFAULT_ONNX_OPSET
 
+        # Send torch export warnings to stdout (and therefore the log file)
+        # so that they don't fill up the command line
+        def warn_to_stdout(message, category, filename, line_number, _, __):
+            sys.stdout.write(
+                warnings.formatwarning(message, category, filename, line_number)
+            )
+
+        default_warnings = warnings.showwarning
+        warnings.showwarning = warn_to_stdout
+
         # Export the model to ONNX
-        # Note: use_external_data_format causes a bug when converting to fp16
         torch.onnx.export(
             state.model,
             dummy_inputs,
@@ -210,6 +240,9 @@ class ExportPytorchModel(stage.GroqitStage):
             opset_version=state.info.opset,
             verbose=False,
         )
+
+        # Restore default warnings behavior
+        warnings.showwarning = default_warnings
 
         # Save inputs and convert to fp16 and int32 (no int64 nor float32/64)
         tensor_helpers.save_inputs([state.inputs], state.original_inputs_file)
@@ -486,7 +519,6 @@ class ConvertOnnxToFp16(stage.GroqitStage):
         input_onnx = state.intermediate_results[0]
 
         # Convert the model to FP16
-
         # Some ops will not be converted to fp16 because they are in a block list
         # The latest list can be found here. It is not neccesarily the list that
         # our version of onnxmltools sees
@@ -494,7 +526,7 @@ class ConvertOnnxToFp16(stage.GroqitStage):
 
         # Legalize ops are ops that have been or are currently in the block list
         # that we explicitly want removed
-        legalize_ops = ["InstanceNormalization", "Resize"]
+        legalize_ops = ["InstanceNormalization", "Resize", "Max"]
         op_block_list = (
             onnxmltools.utils.float16_converter.DEFAULT_OP_BLOCK_LIST.copy()
         )
@@ -504,14 +536,20 @@ class ConvertOnnxToFp16(stage.GroqitStage):
             if op in op_block_list:
                 op_block_list.remove(op)
 
+        # Infer shapes before converting to FP16 to enable models with >2GB
+        onnx.shape_inference.infer_shapes_path(input_onnx)
+
         fp32_model = onnx.load_model(input_onnx)
         fp16_model = onnxmltools.utils.float16_converter.convert_float_to_float16(
-            fp32_model, op_block_list=op_block_list
+            fp32_model, op_block_list=op_block_list, disable_shape_infer=True
         )
 
-        # Save F16 model
+        # Save FP16 model (use external data format if needed)
         output_path = state.converted_onnx_file
-        onnxmltools.utils.save_model(fp16_model, output_path)
+        try:
+            onnxmltools.utils.save_model(fp16_model, output_path)
+        except ValueError:
+            onnx.save_model(fp16_model, output_path, save_as_external_data=True)
 
         # Check that the converted model is still valid
         success_msg = "\tSuccess converting ONNX model to fp16"
