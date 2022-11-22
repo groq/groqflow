@@ -9,6 +9,13 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 import groqflow.groqmodel.cloud as cloud
+
+# TODO: Remove try block once GroqFlow Remote becomes part of the release
+try:
+    import groqflow.groqmodel.remote as remote
+except ModuleNotFoundError:
+    # Proper exceptions are raised if we attempt to use this module on a release branch
+    pass
 import groqflow.common.exceptions as exp
 import groqflow.common.printing as printing
 import groqflow.common.build as build
@@ -67,6 +74,7 @@ class GroqModel:
 
         self.tensor_type = tensor_type
         self.state = state
+        self.remote_client = None
         self.log_execute_path = os.path.join(
             build.output_dir(state.cache_dir, self.state.config.build_name),
             "log_execute.txt",
@@ -161,57 +169,45 @@ class GroqModel:
     def benchmark(
         self, inputs: Optional[Dict] = None, repetitions: int = 100
     ) -> GroqMeasuredPerformance:
-        if os.environ.get("GROQMODEL_BENCHMARK_ENABLE") == "True":
-            if inputs is None:
-                printing.log_info(
-                    (
-                        "No inputs received for benchmark. Using the inputs"
-                        " provided during model compilation."
-                    )
+        if inputs is None:
+            printing.log_info(
+                (
+                    "No inputs received for benchmark. Using the inputs"
+                    " provided during model compilation."
                 )
-
-                # Load previously-saved input
-                inputs = np.load(
-                    self.state.original_inputs_file, allow_pickle=True
-                ).item()
-
-            else:
-                self._validate_inputs(inputs, "benchmark")
-
-            _, benchmark_results = self._execute(
-                input_collection=[inputs], repetitions=repetitions
             )
 
-            self.state.info.measured_latency = benchmark_results.latency
-            self.state.info.measured_throughput = benchmark_results.throughput
+            # Load previously-saved input
+            inputs = np.load(
+                self.state.original_inputs_file, allow_pickle=True
+            ).item()
 
-            return benchmark_results
         else:
-            raise exp.GroqFlowError(
-                "This GroqModel implementation is non-performant. "
-                "We do not recommend calling benchmark()."
-            )
+            self._validate_inputs(inputs, "benchmark")
+
+        _, benchmark_results = self._execute(
+            input_collection=[inputs], repetitions=repetitions
+        )
+
+        self.state.info.measured_latency = benchmark_results.latency
+        self.state.info.measured_throughput = benchmark_results.throughput
+
+        return benchmark_results
 
     def benchmark_abunch(
         self, input_collection: Collection, repetitions: int = 1
     ) -> GroqMeasuredPerformance:
 
-        if os.environ.get("GROQMODEL_BENCHMARK_ENABLE") == "True":
-            self._validate_input_collection(input_collection, "benchmark_abunch")
+        self._validate_input_collection(input_collection, "benchmark_abunch")
 
-            _, benchmark_results = self._execute(
-                input_collection=input_collection, repetitions=repetitions
-            )
+        _, benchmark_results = self._execute(
+            input_collection=input_collection, repetitions=repetitions
+        )
 
-            self.state.info.measured_latency = benchmark_results.latency
-            self.state.info.measured_throughput = benchmark_results.throughput
+        self.state.info.measured_latency = benchmark_results.latency
+        self.state.info.measured_throughput = benchmark_results.throughput
 
-            return benchmark_results
-        else:
-            raise exp.GroqFlowError(
-                "This GroqModel implementation is non-performant. "
-                "We do not recommend calling benchmark_abunch()."
-            )
+        return benchmark_results
 
     def _validate_input_collection(self, input_collection, function_name) -> None:
         if input_collection is None:
@@ -254,19 +250,20 @@ class GroqModel:
 
     def _select_backend(self):
         # Define backend
-        # TODO: Allow for backend to be changed using python once CLOUD backend is released
+        # TODO: Allow backend to be changed using python once Remote backend is publicly released
         if os.environ.get("GROQMODEL_BACKEND"):
             groqmodel_backend_env_var = os.environ.get("GROQMODEL_BACKEND")
             try:
                 backend = build.Backend(groqmodel_backend_env_var)
-            except ValueError:
+            except ValueError as e:
                 raise ValueError(
                     (
                         "GROQMODEL_BACKEND environment variable set to "
                         f'"{groqmodel_backend_env_var}", but only "local", "cloud", '
-                        'and "auto" are valid.'
+                        '"remote", and "auto" are valid. '
+                        '"remote" backend is not yet recommended.'
                     )
-                )
+                ) from e
         else:
             backend = build.Backend.LOCAL
 
@@ -279,6 +276,25 @@ class GroqModel:
                 )
             else:
                 backend = build.Backend.LOCAL
+
+        if backend == build.Backend.REMOTE and self.remote_client is None:
+            # Check if we are trying to use GroqFlow Remote on a public release
+            if "groqflow.groqmodel.remote" not in sys.modules:
+                raise exp.GroqModelEnvError(
+                    (
+                        "GroqFlow Remote is not publicly available yet. "
+                        "Please set the environment variable GROQMODEL_BACKEND to 'local'."
+                    )
+                )
+
+            # Setup remote client if needed
+            remote_url = os.environ.get("GROQFLOW_REMOTE_URL")
+            self.remote_client = (
+                remote.RemoteClient()
+                if remote_url is None
+                else remote.RemoteClient(remote_url)
+            )
+
         return backend
 
     # Shared execution function
@@ -317,10 +333,20 @@ class GroqModel:
         bringup_topology = shared_state.topology_initialized(self.state.topology)
 
         # Select execution script according to backend
-        if self._select_backend() == build.Backend.CLOUD:
+        backend = self._select_backend()
+        if backend == build.Backend.CLOUD:
             cloud.execute_groqchip_remotely(
                 bringup_topology, repetitions, self.state, self.log_execute_path
             )
+        elif backend == build.Backend.REMOTE:
+            try:
+                self.remote_client.execute(self.state, repetitions)
+            except Exception as e:
+                raise exp.GroqModelRemoteError(
+                    (
+                        "There was an issue when running your model using GroqFlow Remote. "
+                    )
+                ) from e
         else:
             self._execute_locally(bringup_topology, repetitions)
 
@@ -372,7 +398,7 @@ class GroqModel:
 
         if not self.checked_dependencies:
             self.checked_dependencies = sdk.check_dependencies(
-                require_runtime=True, require_groqapi=True
+                require_runtime=True, require_devtools=True
             )
 
         # Check local number of GroqChips available

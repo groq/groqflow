@@ -5,7 +5,6 @@ import pathlib
 import onnx
 import groqflow.justgroqit.stage as stage
 import groqflow.common.exceptions as exp
-import groqflow.justgroqit.ignition as ignition
 import groqflow.common.printing as printing
 import groqflow.common.build as build
 import groqflow.common.onnx_helpers as onnx_helpers
@@ -76,10 +75,6 @@ class CompileOnnx(stage.GroqitStage):
 
         input_onnx = get_and_analyze_onnx(state)
 
-        # Create output folder if it doesn't exist
-        if not os.path.isdir(state.compile_dir):
-            os.mkdir(state.compile_dir)
-
         # Select either bake or SDK
         if state.use_sdk:
             cmd = sdk.find_tool("groq-compiler")
@@ -120,29 +115,63 @@ class CompileOnnx(stage.GroqitStage):
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as process:
             for line in process.stdout:
-                print(line.decode("utf8"), end="")
+                string = line.decode("utf8")
+                print(string, end="")
+
+                # Parse the compiler's RAM usage from its log
+                # FIXME: replace with a better approach if possible
+                if "Max memory usage" in string:
+                    mem_usage = int(float(string.split(":")[3].split(" ")[1]))
+                    mem_usage_units = string.split(":")[3].split(" ")[2]
+                    if mem_usage_units == "KiB\n":
+                        state.info.compiler_ram_bytes = mem_usage * 1024
+                    elif mem_usage_units == "MiB\n":
+                        state.info.compiler_ram_bytes = mem_usage * 1024 * 1024
+                    elif mem_usage_units == "GiB\n":
+                        state.info.compiler_ram_bytes = mem_usage * 1024 * 1024 * 1024
 
         printing.logn("Groq Compiler exited")
 
-        aa_files = [
+        find_files_by_extension = lambda ext: [
             os.path.join(dp, f)
             for dp, dn, filenames in os.walk(
                 build.output_dir(state.cache_dir, state.config.build_name)
             )
             for f in filenames
-            if os.path.splitext(f)[1] == ".aa"
+            if os.path.splitext(f)[1] == ext
         ]
 
-        num_aa = sum(["output." in f for f in aa_files])
+        auto_asm = "--auto-asm" in state.config.compiler_flags
+        if auto_asm:
+            output_files = find_files_by_extension(".iop")
+        else:
+            output_files = find_files_by_extension(".aa")
+
+        num_outs = sum(["output." in f for f in output_files])
+
         state.info.compiler_success = (
             True
-            if (state.num_chips_used == 1 and num_aa == 1)
-            or (state.num_chips_used != 1 and state.num_chips_used == num_aa - 1)
+            if (state.num_chips_used == 1 and num_outs == 1)
+            or (
+                state.num_chips_used != 1
+                and state.num_chips_used == num_outs - 1
+                and not os.environ.get(build.environment_variables["internal"])
+            )
+            or (
+                state.num_chips_used != 1
+                and state.num_chips_used == num_outs
+                and os.environ.get(build.environment_variables["internal"])
+            )
             else False
         )
 
         if state.info.compiler_success:
-            state.intermediate_results = aa_files
+            state.intermediate_results = output_files
+            if auto_asm:
+                # Building the IOP files qualifies the build as a success
+                # because those IOP files are the requirement for running
+                # a GroqModel instance.
+                state.build_status = build.Status.SUCCESSFUL_BUILD
         else:
             msg = f"""
             Attempted use Groq Compiler to compile your model's ONNX file into Groq Alan Assembly (.aa)
@@ -194,6 +223,7 @@ class Assemble(stage.GroqitStage):
             # Select other flags
             input_aa = f"{state.compile_dir}/output.aa"
             output_iop = f"{state.compile_dir}/output.iop"
+
             cmd = (
                 cmd
                 + [input_aa, "--output-iop", output_iop]
@@ -204,21 +234,10 @@ class Assemble(stage.GroqitStage):
         else:
 
             sdk.check_dependencies(
-                require_groqapi=True,
+                require_devtools=True,
                 require_runtime=True,
                 exception_type=exp.GroqitStageError,
             )
-
-            if state.config.assembler_flags != ignition.default_assembler_flags:
-                msg = f"""
-                groqit() assembler_flags argument is not supported when the number of chips
-                being used is > 1. groqit() attempted to build with {state.num_chips_used}
-                and assembler_flags={state.config.assembler_flags}.
-
-                Hint: you can manually set the number of chips to 1 with
-                groqit(num_chips=1, ...).
-                """
-                raise exp.GroqitStageError(msg)
 
             groqit_folder = str(
                 pathlib.Path(__file__).parent.resolve().parents[0].parent.resolve()
@@ -250,9 +269,15 @@ class Assemble(stage.GroqitStage):
                 ]
 
             cmd = cmd + [
+                "-t",
                 state.topology,
+                "-d",
                 state.compile_dir,
             ]
+
+            if "--large-program" in state.config.compiler_flags:
+                is_large_program = "-l=True"
+                cmd = cmd + [is_large_program]
 
         # Remove duplicated flags
         cmd = sorted(set(cmd), key=cmd.index)

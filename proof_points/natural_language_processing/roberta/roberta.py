@@ -35,7 +35,11 @@ def evaluate_roberta(rebuild_policy=None, should_execute=None):
     # generate groq model
     build_name = "roberta"
     groq_model = groqit(
-        torch_model, dummy_inputs, rebuild=rebuild_policy, build_name=build_name
+        torch_model,
+        dummy_inputs,
+        compiler_flags=["--large-program"],
+        rebuild=rebuild_policy,
+        build_name=build_name,
     )
 
     # compute performance on CPU and GroqChip
