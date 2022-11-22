@@ -538,10 +538,10 @@ class ConvertOnnxToFp16(stage.GroqitStage):
 
         # Infer shapes before converting to FP16 to enable models with >2GB
         onnx.shape_inference.infer_shapes_path(input_onnx)
-
-        fp32_model = onnx.load_model(input_onnx)
-        fp16_model = onnxmltools.utils.float16_converter.convert_float_to_float16(
-            fp32_model, op_block_list=op_block_list, disable_shape_infer=True
+        fp16_model = (
+            onnxmltools.utils.float16_converter.convert_float_to_float16_model_path(
+                input_onnx, op_block_list=op_block_list, disable_shape_infer=True
+            )
         )
 
         # Save FP16 model (use external data format if needed)
