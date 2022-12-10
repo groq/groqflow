@@ -34,7 +34,7 @@ def check_shapes_and_dtypes(inputs, expected_shapes, expected_dtypes):
         raise exp.GroqFlowError(msg)
 
 
-def save_inputs(inputs, inputs_file):
+def save_inputs(inputs, inputs_file, input_dtypes=None):
 
     # Convert inputs to fp16 and int32
     inputs_converted = copy.deepcopy(inputs)
@@ -49,6 +49,9 @@ def save_inputs(inputs, inputs_file):
                 inputs_converted[i][k] = inputs_converted[i][k].cpu().detach().numpy()
             if tf.is_tensor(inputs_converted[i][k]):
                 inputs_converted[i][k] = inputs_converted[i][k].numpy()
+            if input_dtypes is not None and input_dtypes[k] is not None:
+                inputs_converted[i][k] = inputs_converted[i][k].astype(input_dtypes[k])
+                continue
             if (
                 inputs_converted[i][k].dtype == np.float32
                 or inputs_converted[i][k].dtype == np.float64

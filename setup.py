@@ -19,6 +19,9 @@ setup(
     install_requires=[
         "onnx==1.11.0",
         "onnxmltools==1.10.0",
+        "hummingbird-ml==0.4.4",
+        "scikit-learn==1.1.1",
+        "xgboost==1.6.1",
         "onnxruntime==1.10.0",
         "paramiko==2.11.0",
         "torch>=1.12.1",

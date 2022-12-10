@@ -527,9 +527,7 @@ class ConvertOnnxToFp16(stage.GroqitStage):
         # Legalize ops are ops that have been or are currently in the block list
         # that we explicitly want removed
         legalize_ops = ["InstanceNormalization", "Resize", "Max"]
-        op_block_list = (
-            onnxmltools.utils.float16_converter.DEFAULT_OP_BLOCK_LIST.copy()
-        )
+        op_block_list = onnxmltools.utils.float16_converter.DEFAULT_OP_BLOCK_LIST.copy()
         for op in legalize_ops:
             # Check to see that they are not in the block list before we remove them
             # Neccesary because the block list may be updated, and not in the state we expect
@@ -538,6 +536,7 @@ class ConvertOnnxToFp16(stage.GroqitStage):
 
         # Infer shapes before converting to FP16 to enable models with >2GB
         onnx.shape_inference.infer_shapes_path(input_onnx)
+
         fp32_model = onnx.load_model(input_onnx)
         fp16_model = onnxmltools.utils.float16_converter.convert_float_to_float16(
             fp32_model, op_block_list=op_block_list, disable_shape_infer=True

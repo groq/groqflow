@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 from typing import Tuple, Union, Dict, Any
 from stat import S_ISDIR
 import yaml
@@ -75,22 +76,47 @@ def save_remote_config(ip, username, accelerator) -> None:
         yaml.dump(conf, outfile)
 
 
-def connect_to_host(ip, username) -> paramiko.SSHClient:
+def connect_to_host(ip, username, accelerator) -> paramiko.SSHClient:
     print(f"Connecting to {username}@{ip}")
 
     class AllowAllKeys(paramiko.MissingHostKeyPolicy):
         def missing_host_key(self, client, hostname, key):
             return
 
-    ssh_config = paramiko.SSHConfig.from_path("/etc/ssh/ssh_config")
-    host_conf = ssh_config.lookup(ip)
-    sock = paramiko.ProxyCommand(host_conf["proxycommand"])
+    if accelerator == "groqchip":
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(ip, port=22, username=username)
 
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-    client.load_host_keys(os.path.expanduser("~/.ssh/known_hosts"))
-    client.set_missing_host_key_policy(AllowAllKeys())
-    client.connect(ip, username=username, sock=sock)
+    elif accelerator == "gpu":
+        ssh_config = paramiko.SSHConfig.from_path("/etc/ssh/ssh_config")
+
+        # Set SFT_AUTH_SOCK env var to enable users to access gcloud instances
+        auth_sock_lines = subprocess.check_output(
+            [
+                "find",
+                f"/var/run/sftd/client_trust_forwarding/{username}/",
+                "-type",
+                "s",
+            ]
+        )
+        auth_sock = auth_sock_lines.split()[0]
+        unicode_auth_sock = auth_sock.decode("utf-8")
+        os.environ["SFT_AUTH_SOCK"] = unicode_auth_sock
+
+        host_conf = ssh_config.lookup(ip)
+        sock = paramiko.ProxyCommand(host_conf["proxycommand"])
+
+        client = paramiko.SSHClient()
+        client.load_system_host_keys()
+        client.load_host_keys(os.path.expanduser("~/.ssh/known_hosts"))
+        client.set_missing_host_key_policy(AllowAllKeys())
+        client.connect(ip, username=username, sock=sock)
+
+    else:
+        msg = f"Only GPU and GroqChip are supported, but received {accelerator}"
+        raise exp.GroqModelRuntimeError(msg)
+
     return client
 
 
@@ -141,7 +167,7 @@ def configure_remote(accelerator: str) -> Tuple[str, str]:
 
             # Get IP
             while ip is None or ip == "":
-                ip = input("GPU instance IP: ")
+                ip = input("GPU instance ASA name (Do not use IP): ")
 
             # Get username
             if username is None:
@@ -195,7 +221,7 @@ def setup_connection(accelerator: str) -> paramiko.SSHClient:
     ip, username = configure_remote(accelerator)
 
     # Connect to host
-    client = connect_to_host(ip, username)
+    client = connect_to_host(ip, username, accelerator)
 
     if accelerator == "groqchip":
         # Check for GroqChips and transfer common files
