@@ -22,9 +22,7 @@ def evaluate_electra(rebuild_policy=None, should_execute=True):
     # load pre-trained torch model
     pretrained_model_name = "howey/electra-base-sst2"
 
-    tokenizer = transformers.ElectraTokenizerFast.from_pretrained(
-        pretrained_model_name
-    )
+    tokenizer = transformers.ElectraTokenizerFast.from_pretrained(pretrained_model_name)
     pytorch_model = transformers.ElectraForSequenceClassification.from_pretrained(
         pretrained_model_name
     )

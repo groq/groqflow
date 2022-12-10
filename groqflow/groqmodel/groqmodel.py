@@ -70,8 +70,9 @@ class TopologyState:
 
 
 class GroqModel:
-    def __init__(self, state: build.State, tensor_type=np.array):
+    def __init__(self, state: build.State, tensor_type=np.array, input_dtypes=None):
 
+        self.input_dtypes = input_dtypes
         self.tensor_type = tensor_type
         self.state = state
         self.remote_client = None
@@ -132,9 +133,7 @@ class GroqModel:
         """
 
         # Get the number of cycles needed to execute the model
-        on_chip_compute_cycles = build.load_yaml(self.state.stats_file)[
-            "total_cycles"
-        ]
+        on_chip_compute_cycles = build.load_yaml(self.state.stats_file)["total_cycles"]
 
         # TODO: Read the frequency from a central location once the issue below is solved
         # https://git.groq.io/code/Groq/-/issues/14155
@@ -164,6 +163,10 @@ class GroqModel:
 
         estimated_throughput = 1.0 / estimated_total_latency
 
+        self.state.info.estimated_latency = estimated_total_latency
+        self.state.info.estimated_throughput = estimated_throughput
+        self.state.save()
+
         return GroqEstimatedPerformance(estimated_total_latency, estimated_throughput)
 
     def benchmark(
@@ -178,9 +181,7 @@ class GroqModel:
             )
 
             # Load previously-saved input
-            inputs = np.load(
-                self.state.original_inputs_file, allow_pickle=True
-            ).item()
+            inputs = np.load(self.state.original_inputs_file, allow_pickle=True).item()
 
         else:
             self._validate_inputs(inputs, "benchmark")
@@ -191,6 +192,7 @@ class GroqModel:
 
         self.state.info.measured_latency = benchmark_results.latency
         self.state.info.measured_throughput = benchmark_results.throughput
+        self.state.save()
 
         return benchmark_results
 
@@ -206,6 +208,7 @@ class GroqModel:
 
         self.state.info.measured_latency = benchmark_results.latency
         self.state.info.measured_throughput = benchmark_results.throughput
+        self.state.save()
 
         return benchmark_results
 
@@ -322,7 +325,9 @@ class GroqModel:
             raise exp.GroqFlowError(msg)
 
         # Save inputs to file
-        tensor_helpers.save_inputs(input_collection, self.state.execution_inputs_file)
+        tensor_helpers.save_inputs(
+            input_collection, self.state.execution_inputs_file, self.input_dtypes
+        )
 
         # Remove previously stored latency/outputs
         if os.path.isfile(self.state.outputs_file):
@@ -350,9 +355,7 @@ class GroqModel:
         else:
             self._execute_locally(bringup_topology, repetitions)
 
-        return self.state.outputs_file, GroqMeasuredPerformance(
-            self.state.latency_file
-        )
+        return self.state.outputs_file, GroqMeasuredPerformance(self.state.latency_file)
 
     # Models with a single output are returned as either a torch.tensor,
     # tf.Tensor, or an np.array (see tensor_type)
@@ -360,9 +363,7 @@ class GroqModel:
     # torch.tensors, tf.Tensors, or np.arrays
     def _unpack_results(self, results: List[Dict], output_nodes, num_outputs):
         if self.tensor_type is tf.Tensor:
-            unpacked_results = [
-                tf.convert_to_tensor(results[x]) for x in output_nodes
-            ]
+            unpacked_results = [tf.convert_to_tensor(results[x]) for x in output_nodes]
         else:
             unpacked_results = [self.tensor_type(results[x]) for x in output_nodes]
         return unpacked_results[0] if num_outputs == 1 else tuple(unpacked_results)
@@ -512,6 +513,26 @@ class KerasModelWrapper(GroqModel):
         return self.run(kwargs)
 
 
+class HummingbirdWrapper(GroqModel):
+    def __init__(self, state):
+        super(HummingbirdWrapper, self).__init__(
+            state, input_dtypes={"input_0": "float32"}
+        )
+
+    def predict(self, input):
+        return self.run({"input_0": input})[0]
+
+    def predict_proba(self, input):
+        return self.run({"input_0": input})[1]
+
+    def _unpack_results(self, results: List[Dict], output_nodes, num_outputs):
+        unpacked_results = [
+            self.tensor_type(results[k]) for k in output_nodes if k != "variable"
+        ]
+        unpacked_results.insert(0, self.tensor_type(results["variable"]))
+        return unpacked_results[0] if num_outputs == 1 else tuple(unpacked_results)
+
+
 def load(build_name: str, cache_dir=build.DEFAULT_CACHE_DIR) -> GroqModel:
     state = build.load_state(cache_dir=cache_dir, build_name=build_name)
 
@@ -519,6 +540,8 @@ def load(build_name: str, cache_dir=build.DEFAULT_CACHE_DIR) -> GroqModel:
         return PytorchModelWrapper(state)
     elif state.model_type == build.ModelType.KERAS:
         return KerasModelWrapper(state)
+    elif state.model_type == build.ModelType.HUMMINGBIRD:
+        return HummingbirdWrapper(state)
     else:
         return GroqModel(state)
 

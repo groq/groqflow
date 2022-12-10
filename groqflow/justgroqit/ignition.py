@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Union, Dict, Any
 import sys
 import os
 import importlib.machinery
@@ -7,13 +7,14 @@ import types
 import json
 import torch
 from typeguard import typechecked
-import groqflow.common.exceptions as exp
-import groqflow.justgroqit.export as export
-import groqflow.justgroqit.compile as compile
-import groqflow.justgroqit.stage as stage
-import groqflow.common.printing as printing
 import groqflow.common.build as build
 import groqflow.common.cache as cache
+import groqflow.common.exceptions as exp
+import groqflow.common.printing as printing
+import groqflow.justgroqit.compile as compile
+import groqflow.justgroqit.export as export
+import groqflow.justgroqit.stage as stage
+import groqflow.justgroqit.hummingbird as hummingbird
 
 try:
     import tensorflow as tf
@@ -79,13 +80,23 @@ default_onnx_sequence = stage.Sequence(
     ],
 )
 
+default_hummingbird_sequence = stage.Sequence(
+    "default_hummingbird_sequence",
+    "Building Hummingbird Model",
+    [
+        hummingbird.ConvertHummingbirdModel(),
+        export.OptimizeOnnxModel(),
+        export.CheckOnnxCompatibility(),
+        compile.CompileOnnx(),
+        compile.Assemble(),
+    ],
+)
+
 default_compiler_flags = []
 
 default_assembler_flags = [
-    "--auto-agt",
     "--ifetch-from-self",
-    "--ifetch-slice-ordering",
-    "round-robin",
+    "--ifetch-slice-ordering=round-robin",
 ]
 
 
@@ -225,7 +236,7 @@ def _validate_cached_model(
     current_version_decoded = _decode_version_number(version)
     state_version_decoded = _decode_version_number(state.groqflow_version)
 
-    out_of_date = False
+    out_of_date: Union[str, bool] = False
     if current_version_decoded["major"] > state_version_decoded["major"]:
         out_of_date = "major"
     elif current_version_decoded["minor"] > state_version_decoded["minor"]:
@@ -280,7 +291,9 @@ def _validate_cached_model(
             result.append(msg)
 
         if model_changed:
-            msg = f'Model "{config.build_name}" changed since the last time it was built.'
+            msg = (
+                f'Model "{config.build_name}" changed since the last time it was built.'
+            )
             result.append(msg)
 
         if input_shapes_changed:
@@ -568,6 +581,7 @@ model_type_to_sequence = {
     build.ModelType.PYTORCH: default_pytorch_sequence,
     build.ModelType.KERAS: default_keras_sequence,
     build.ModelType.ONNX_FILE: default_onnx_sequence,
+    build.ModelType.HUMMINGBIRD: default_hummingbird_sequence,
 }
 
 
@@ -625,6 +639,8 @@ def model_intake(
     #    |------- pytorch model object
     #    |
     #    |------- keras model object
+    #    |
+    #    |------- Hummingbird-supported model object
 
     if user_sequence is None or user_sequence.enable_model_validation:
 
@@ -663,6 +679,8 @@ def model_intake(
                     "Keras model has not been built. Please call "
                     "model.build(input_shape) before running groqit()"
                 )
+        elif hummingbird.is_supported_model(model):
+            model_type = build.ModelType.HUMMINGBIRD
         else:
             raise exp.GroqitIntakeError(
                 "Argument 'model' passed to groqit() is "

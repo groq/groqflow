@@ -31,6 +31,4 @@ groq_model = groqit(pytorch_model, inputs, monitor=True, build_name="monitor_ena
 
 # Rebuild pytorch_model with the monitor disabled
 print("\ngroqit() will now build the model with the monitor disabled...")
-groq_model = groqit(
-    pytorch_model, inputs, monitor=False, build_name="monitor_disabled"
-)
+groq_model = groqit(pytorch_model, inputs, monitor=False, build_name="monitor_disabled")

@@ -241,9 +241,7 @@ class RemoteClient:
             A RemoteGroqModel object that can be used to invoke the uploaded model
         """
 
-        input_names = (
-            [] if len(input_batch) == 0 else list(list(input_batch)[0].keys())
-        )
+        input_names = [] if len(input_batch) == 0 else list(list(input_batch)[0].keys())
         remote_gm = RemoteGroqModel(
             user_name,
             build_name,

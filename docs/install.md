@@ -42,9 +42,10 @@ where `groqflow` is the directory where you cloned the GroqFlow repo in the [pre
 This adds the Groq tools to your path:
 
 ```
-conda install conda-build
-conda develop /opt/groq/runtime/site-packages
+conda env config vars set PYTHONPATH="/opt/groq/runtime/site-packages:$PYTHONPATH"
 ```
+
+**Note:** you will need to reactivate your conda environment for this to take effect.
 
 ### Step 4: Rock-It with groqit()
 

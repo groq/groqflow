@@ -454,8 +454,7 @@ class SemanticSegmentationDataset(Dataset):
         ]
 
         x = [
-            {"pixel_values": self._resize_input(inp["pixel_values"])}
-            for inp in inputs
+            {"pixel_values": self._resize_input(inp["pixel_values"])} for inp in inputs
         ]
         y = [inp["labels"] for inp in inputs]
         if self.num_examples:
@@ -476,9 +475,7 @@ class SemanticSegmentationDataset(Dataset):
 
 
 class SentenceSimilarityDataset(Dataset):
-    def __init__(
-        self, name: str, tokenizer, max_seq_length, num_examples=None
-    ) -> None:
+    def __init__(self, name: str, tokenizer, max_seq_length, num_examples=None) -> None:
         super().__init__(name)
         self.raw_data = load_dataset(name, "en", split="test")
         self.tokenizer = tokenizer

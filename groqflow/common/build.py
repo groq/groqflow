@@ -10,6 +10,7 @@ import hashlib
 import yaml
 import torch
 import numpy as np
+import sklearn.base
 import groqflow.common.exceptions as exp
 
 try:
@@ -27,6 +28,7 @@ UnionValidModelInstanceTypes = Union[
     torch.nn.Module,
     torch.jit.ScriptModule,
     tf.keras.Model,
+    sklearn.base.BaseEstimator,
 ]
 
 
@@ -97,6 +99,7 @@ class ModelType(enum.Enum):
     PYTORCH = "pytorch"
     KERAS = "keras"
     ONNX_FILE = "onnx_file"
+    HUMMINGBIRD = "hummingbird"
     UNKNOWN = "unknown"
 
 
@@ -198,6 +201,11 @@ def hash_model(model, model_type: ModelType, hash_params: bool = True):
 
         # Return hash of topology and parameters
         return hashlib.sha256(hashable_model).hexdigest()
+
+    elif model_type == ModelType.HUMMINGBIRD:
+        import pickle
+
+        return hashlib.sha256(pickle.dumps(model)).hexdigest()
 
     else:
         msg = f"""
@@ -302,6 +310,8 @@ class Info:
     assembler_command: Optional[str] = None
     measured_latency: Optional[float] = None
     measured_throughput: Optional[float] = None
+    estimated_latency: Optional[float] = None
+    estimated_throughput: Optional[float] = None
     skipped_stages: int = 0
     opset: Optional[int] = DEFAULT_ONNX_OPSET
     compiled_onnx_input_bytes: int = None
@@ -378,6 +388,9 @@ class State:
         # Always automatically save the state.yaml whenever State is modified
         # But don't bother saving until after __post_init__ is done (indicated
         # by the after_post_init flag)
+        # Note: This only works when elements of the state are set directly.
+        # When an element of state.info gets set, for example, state needs
+        # to be explicitly saved by calling state.save().
         if self.after_post_init and name != "after_post_init":
             self.save()
 
@@ -407,9 +420,7 @@ class State:
 
     @property
     def onnx_dir(self):
-        return os.path.join(
-            output_dir(self.cache_dir, self.config.build_name), "onnx"
-        )
+        return os.path.join(output_dir(self.cache_dir, self.config.build_name), "onnx")
 
     @property
     def base_onnx_file(self):
@@ -501,9 +512,7 @@ class State:
             yaml.dump(state_dict, outfile)
 
 
-def load_state(
-    cache_dir=DEFAULT_CACHE_DIR, build_name=None, state_path=None
-) -> State:
+def load_state(cache_dir=DEFAULT_CACHE_DIR, build_name=None, state_path=None) -> State:
     if state_path is not None:
         file_path = state_path
     elif build_name is not None:

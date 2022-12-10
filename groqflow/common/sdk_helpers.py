@@ -40,9 +40,7 @@ def get_num_chips_available(pci_devices=None):
 
     # Capture the list of pci devices on the system using the linux lspci utility
     if pci_devices is None:
-        pci_devices = (
-            subprocess.check_output([lspci, "-n"]).decode("utf-8").split("\n")
-        )
+        pci_devices = subprocess.check_output([lspci, "-n"]).decode("utf-8").split("\n")
 
     # Unique registered vendor id: 1de0, and device id: "0000"
     groq_card_id = "1de0:0000"
