@@ -15,6 +15,7 @@ The following reviews the different functionality provided by GroqFlow.
   - [Compiler Flags](#compiler-flags)
   - [Assembler Flags](#assembler-flags)
   - [Choose a Cache Directory](#choose-a-cache-directory)
+  - [Perform Post-training Quantization](#perform-post-training-quantization)
 - [GroqModel Methods](#groqmodel-methods)
   - [GroqModel Class](#groqmodel-class)
   - [GroqModel Specializations](#groqmodel-specializations)
@@ -301,6 +302,27 @@ Resulting contents of ~:
 ```
 
 See: `examples/pytorch/cache_dir.py`
+
+---
+
+### Perform Post Training Quantization
+
+By default, `groqit()` converts the input model into an equivalent ONNX model, optimizes the ONNX model, and converts the model's trained parameters into type float16 before compiling and assembling the model into a groq model.
+
+When quantization data samples are specified to the `quantization_samples` argument, `groqit()` performs post-training quantization to int8 on the equivalent ONNX model using the specified samples, before compiling and assembling a GroqModel from the quantized ONNX model. The provided unlabeled samples are used to estimate distribution statistics of the data to pre-compute scales and zero points of the float-to-int8 range mapping for the activation tensors in the model. After static quantization, all conv, matmul, and relu operations in the quantized model will have int8 precision. Please note that rebuild is required when different quantization samples are provided, so the rebuild policy in this case must be set to `always`.
+
+Currently, `groqit()` only provides post training quantization support for PyTorch models.
+
+**quantization_samples**
+- A list of data samples to be used to perform post-training quantization to the input model, specified by `groqit(quantization_samples=my_samples, ...)`. Each sample should be a numpy array or similar object
+
+### Examples:
+
+```
+gmodel = groqit(model, inputs, quantization_samples=my_samples)
+```
+
+See: `examples/pytorch/quantization.py`
 
 ---
 

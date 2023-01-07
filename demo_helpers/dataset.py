@@ -12,6 +12,8 @@ import zipfile
 
 from datasets import load_dataset
 from datasets.utils.file_utils import cached_path
+from datasets.utils import DownloadConfig
+from transformers import BertTokenizerFast
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -920,6 +922,56 @@ class COCODataset(Dataset):
                 self._postprocess_single(output, img_id, self.coco.coco.imgs[img_id])
             )
         return results
+
+
+def get_sst():
+    """
+    Load SST data and convert to necessary format
+    """
+    datasets_dir = "datasets"
+    download_config = DownloadConfig(cache_dir=datasets_dir)
+    train_data = load_dataset(
+        "sst", split="train", data_dir=datasets_dir, download_config=download_config
+    )
+    test_data = load_dataset(
+        "sst", split="test", data_dir=datasets_dir, download_config=download_config
+    )
+
+    tokenizer = BertTokenizerFast.from_pretrained("howey/bert-base-uncased-sst2")
+    train_sentence = [
+        tokenizer.encode(
+            x,
+            truncation=True,
+            padding="max_length",
+            max_length=128,
+            add_special_tokens=True,
+        )
+        for x in train_data["sentence"]
+    ]
+    test_sentence = [
+        tokenizer.encode(
+            x,
+            truncation=True,
+            padding="max_length",
+            max_length=128,
+            add_special_tokens=True,
+        )
+        for x in test_data["sentence"]
+    ]
+
+    return (train_sentence, train_data["label"]), (test_sentence, test_data["label"])
+
+
+def get_sst_quantization_samples(quantize_samples_count=1000):
+    (
+        train_data,
+        _,
+    ) = get_sst()
+    x_train, _ = train_data
+    limit = lambda data: data[:quantize_samples_count]
+    x_train = limit(x_train)
+
+    return [(np.array([x], dtype=np.int64), (np.array([x]) != 0)) for x in x_train]
 
 
 def create_dataset(

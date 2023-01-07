@@ -1,5 +1,6 @@
 import groqflow.common.build as build
 import groqflow.justgroqit.stage as stage
+import groqflow.justgroqit.export as export
 import groqflow.common.exceptions as exp
 
 import hummingbird.ml  # pylint: disable=import-error
@@ -178,6 +179,9 @@ class ConvertHummingbirdModel(stage.GroqitStage):
         onnx_model = onnx.tools.update_model_dims.update_inputs_outputs_dims(
             onnx_model, input_dims, output_dims
         )
+
+        # Save output node names
+        state.expected_output_names = export.get_output_names(onnx_model)
 
         onnx.save(onnx_model, state.base_onnx_file)
 

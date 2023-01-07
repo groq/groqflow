@@ -5,6 +5,7 @@ import re
 import warnings
 import sys
 import copy
+from typing import Union
 import torch
 import onnxruntime
 import onnxmltools
@@ -15,6 +16,7 @@ import groqflow.common.build as build
 import groqflow.common.tensor_helpers as tensor_helpers
 import groqflow.common.onnx_helpers as onnx_helpers
 import groqflow.common.sdk_helpers as sdk
+import groqflow.common.quantization_helpers as quant_helpers
 
 try:
     import tensorflow as tf
@@ -40,6 +42,13 @@ def _check_model(onnx_file, success_message, fail_message) -> bool:
         print("\tError while checking generated ONNX file")
         print(e)
         return False
+
+
+def get_output_names(onnx_model: Union[str, onnx.ModelProto]):
+    # Get output names of ONNX file/model
+    if not isinstance(onnx_model, onnx.ModelProto):
+        onnx_model = onnx.load(onnx_model)
+    return [node.name for node in onnx_model.graph.output]  # pylint: disable=no-member
 
 
 class ReceiveOnnxModel(stage.GroqitStage):
@@ -87,6 +96,9 @@ class ReceiveOnnxModel(stage.GroqitStage):
             for _input in model.graph.input  # pylint: disable=no-member
         ]
 
+        # Save output node names
+        state.expected_output_names = get_output_names(model)
+
         # Check for Dynamic shapes in the model. They can be represented as 0, -1, "unk__".
         for input in input_shapes:
             for dimension in input:
@@ -114,7 +126,10 @@ class ReceiveOnnxModel(stage.GroqitStage):
         shutil.copy(state.model, state.base_onnx_file)
 
         # Save inputs and convert to fp16 and int32 (no int64 nor float32/64)
-        tensor_helpers.save_inputs([state.inputs], state.original_inputs_file)
+        to_downcast = False if state.quantization_samples else True
+        tensor_helpers.save_inputs(
+            [state.inputs], state.original_inputs_file, downcast=to_downcast
+        )
 
         # Check the if the base mode has been exported successfully
         success_msg = "\tSuccess receiving ONNX Model"
@@ -235,17 +250,23 @@ class ExportPytorchModel(stage.GroqitStage):
             dummy_inputs,
             state.base_onnx_file,
             input_names=dummy_input_names,
-            output_names=["output"],
             do_constant_folding=True,
             opset_version=state.info.opset,
             verbose=False,
         )
 
+        # Save output names to ensure we are preserving the order of the outputs
+        state.expected_output_names = get_output_names(state.base_onnx_file)
+
         # Restore default warnings behavior
         warnings.showwarning = default_warnings
 
         # Save inputs and convert to fp16 and int32 (no int64 nor float32/64)
-        tensor_helpers.save_inputs([state.inputs], state.original_inputs_file)
+        to_downcast = False if state.quantization_samples else True
+        print("to_downcast: ", to_downcast)
+        tensor_helpers.save_inputs(
+            [state.inputs], state.original_inputs_file, downcast=to_downcast
+        )
 
         # Check the if the base mode has been exported successfully
         success_msg = "\tSuccess exporting model to ONNX"
@@ -352,10 +373,16 @@ class ExportKerasModel(stage.GroqitStage):
             output_path=state.base_onnx_file,
         )
 
+        # Save output names to ensure we are preserving the order of the outputs
+        state.expected_output_names = get_output_names(state.base_onnx_file)
+
         state.inputs = dict(zip(tuple(input_names), tuple(inputs)))
 
         # Save inputs and convert to fp16 and int32 (no int64 nor float32/64)
-        tensor_helpers.save_inputs([state.inputs], state.original_inputs_file)
+        to_downcast = False if state.quantization_samples else True
+        tensor_helpers.save_inputs(
+            [state.inputs], state.original_inputs_file, downcast=to_downcast
+        )
 
         # Check the if the base mode has been exported successfully
         success_msg = "\tSuccess exporting model to ONNX"
@@ -562,6 +589,55 @@ class ConvertOnnxToFp16(stage.GroqitStage):
             msg = f"""
             Attempted to use onnxmltools, a third party library, to convert your
             model to the float16 datatype, however this operation was not successful.
+            More information may be available in the log file at **{self.logfile_path}**
+            """
+            raise exp.GroqitStageError(msg)
+
+        return state
+
+
+class QuantizeONNXModel(stage.GroqitStage):
+    """
+    Stage that takes an ONNX model and a dataset of quantization samples as inputs,
+    and performs static post-training quantization to the model to int8 precision.
+
+    Expected inputs:
+     - state.model is a path to the ONNX model
+     - state.quantization_dataset is a dataset that is used for static quantization
+
+    Outputs:
+     - A *_quantized.onnx file => the quantized onnx model.
+    """
+
+    def __init__(self):
+        super().__init__(
+            unique_name="quantize_onnx",
+            monitor_message="Quantizing ONNX model",
+        )
+
+    def fire(self, state: build.State):
+        input_path = state.intermediate_results[0]
+        output_path = state.quantized_onnx_file
+
+        quant_helpers.quantize(
+            input_file=input_path,
+            data=state.quantization_samples,
+            output_file=output_path,
+        )
+
+        # Check that the converted model is still valid
+        success_msg = "\tSuccess quantizing ONNX model to int8"
+        fail_msg = "\tFailed quantizing ONNX model to int8"
+        state.info.quantized_onnx_exported = _check_model(
+            state.quantized_onnx_file, success_msg, fail_msg
+        )
+
+        if state.info.quantized_onnx_exported:
+            state.intermediate_results = [output_path]
+        else:
+            msg = f"""
+            Attempted to use {state.quantization_dataset} to statically quantize
+            model to int8 datatype, however this operation was not successful.
             More information may be available in the log file at **{self.logfile_path}**
             """
             raise exp.GroqitStageError(msg)
