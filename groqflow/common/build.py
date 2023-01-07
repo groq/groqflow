@@ -5,6 +5,7 @@ import copy
 import enum
 import math
 from typing import Optional, Any, List, Dict, Union
+from collections.abc import Collection
 import dataclasses
 import hashlib
 import yaml
@@ -304,6 +305,7 @@ class Info:
     opt_onnx_unsupported_ops: Optional[List[str]] = None
     opt_onnx_all_ops_supported: Optional[bool] = None
     converted_onnx_exported: Optional[bool] = None
+    quantized_onnx_exported: Optional[bool] = None
     compiler_success: Optional[bool] = None
     compiler_command: Optional[str] = None
     assembler_success: Optional[bool] = None
@@ -363,11 +365,14 @@ class State:
     build_status: Status = Status.NOT_STARTED
     expected_input_shapes: Optional[Dict[str, list]] = None
     expected_input_dtypes: Optional[Dict[str, list]] = None
+    expected_output_names: Optional[List] = None
     # The results of the most recent stage that was executed
     intermediate_results: Any = None
     # Folder a model file was found in. Useful for processing
     # large quantities of models.
     corpus: str = ""
+
+    quantization_samples: Optional[Collection] = None
 
     def __post_init__(self):
         if self.uid is None:
@@ -444,6 +449,13 @@ class State:
         )
 
     @property
+    def quantized_onnx_file(self):
+        return os.path.join(
+            self.onnx_dir,
+            f"{self.config.build_name}-op{self.info.opset}-opt-quantized_int8.onnx",
+        )
+
+    @property
     def compile_dir(self):
         return os.path.join(
             output_dir(self.cache_dir, self.config.build_name), "compile"
@@ -505,6 +517,17 @@ class State:
         state_dict["build_status"] = self.build_status.value
 
         state_dict["info"]["backend"] = self.info.backend.value
+
+        # During actual execution, quantization_samples in the state
+        # stores the actual quantization samples.
+        # However, we do not save quantization samples
+        # Instead, we save a boolean to indicate whether the model
+        # stored has been quantized by some samples.
+        for key, value in vars(self).items():
+            if key == "quantization_samples" and value is not None:
+                state_dict["quantization_samples"] = True
+            else:
+                state_dict["quantization_samples"] = False
 
         with open(
             state_file(self.cache_dir, self.config.build_name), "w", encoding="utf8"

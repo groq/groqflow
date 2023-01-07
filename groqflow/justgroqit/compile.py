@@ -152,16 +152,7 @@ class CompileOnnx(stage.GroqitStage):
         state.info.compiler_success = (
             True
             if (state.num_chips_used == 1 and num_outs == 1)
-            or (
-                state.num_chips_used != 1
-                and state.num_chips_used == num_outs - 1
-                and not os.environ.get(build.environment_variables["internal"])
-            )
-            or (
-                state.num_chips_used != 1
-                and state.num_chips_used == num_outs
-                and os.environ.get(build.environment_variables["internal"])
-            )
+            or (state.num_chips_used != 1 and state.num_chips_used == num_outs)
             else False
         )
 

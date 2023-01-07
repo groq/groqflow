@@ -8,10 +8,10 @@ from collections.abc import Collection
 from dataclasses import dataclass
 import numpy as np
 import torch
-import groqflow.groqmodel.cloud as cloud
 
-# TODO: Remove try block once GroqFlow Remote becomes part of the release
+# TODO: Remove try block once GroqFlow "remote" and "cloud" become part of the release
 try:
+    import groqflow.groqmodel.cloud as cloud
     import groqflow.groqmodel.remote as remote
 except ModuleNotFoundError:
     # Proper exceptions are raised if we attempt to use this module on a release branch
@@ -280,16 +280,22 @@ class GroqModel:
             else:
                 backend = build.Backend.LOCAL
 
-        if backend == build.Backend.REMOTE and self.remote_client is None:
-            # Check if we are trying to use GroqFlow Remote on a public release
-            if "groqflow.groqmodel.remote" not in sys.modules:
-                raise exp.GroqModelEnvError(
-                    (
-                        "GroqFlow Remote is not publicly available yet. "
-                        "Please set the environment variable GROQMODEL_BACKEND to 'local'."
-                    )
+        # Check if we are trying to use GroqFlow Remote/Cloud on a public release
+        if (
+            backend == build.Backend.CLOUD
+            and "groqflow.groqmodel.cloud" not in sys.modules
+        ) or (
+            backend == build.Backend.REMOTE
+            and "groqflow.groqmodel.remote" not in sys.modules
+        ):
+            raise exp.GroqModelEnvError(
+                (
+                    f"GroqFlow {backend.value} is not publicly available yet. "
+                    "Please set the environment variable GROQMODEL_BACKEND to 'local'."
                 )
+            )
 
+        if backend == build.Backend.REMOTE and self.remote_client is None:
             # Setup remote client if needed
             remote_url = os.environ.get("GROQFLOW_REMOTE_URL")
             self.remote_client = (
@@ -325,8 +331,12 @@ class GroqModel:
             raise exp.GroqFlowError(msg)
 
         # Save inputs to file
+        to_downcast = False if self.state.quantization_samples else True
         tensor_helpers.save_inputs(
-            input_collection, self.state.execution_inputs_file, self.input_dtypes
+            input_collection,
+            self.state.execution_inputs_file,
+            self.input_dtypes,
+            downcast=to_downcast,
         )
 
         # Remove previously stored latency/outputs
@@ -375,9 +385,17 @@ class GroqModel:
 
         np_result = np.load(packed_results, allow_pickle=True)
 
-        # Get the name of outputs based on the first element of the batch
-        output_nodes = list(np_result[0].keys())
+        # Ensure that the output nodes generated are the same as the expected output nodes
+        output_nodes = self.state.expected_output_names
         num_outputs = len(output_nodes)
+        output_nodes_received = list(np_result[0].keys())
+        if not all(node in output_nodes for node in output_nodes_received):
+            raise exp.GroqModelRuntimeError(
+                (
+                    f"GroqFlow expected outputs {str(self.state.expected_output_names)} "
+                    f"but got {str(output_nodes_received)}"
+                )
+            )
 
         # Unpack all results from the collection and pack them in a list
         unpacked_result_list = [
