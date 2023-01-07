@@ -50,9 +50,7 @@ torch.onnx.export(
 # You can use numpy arrays as inputs to our ONNX model
 def to_numpy(tensor):
     return (
-        tensor.detach().cpu().numpy()
-        if tensor.requires_grad
-        else tensor.cpu().numpy()
+        tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
     )
 
 

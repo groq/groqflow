@@ -9,8 +9,9 @@ You can learn more about the concepts demonstrated in the examples by referencin
 - [Groq Tool Requirements](#groq-tool-requirements)
 - [Understanding Examples](#understanding-examples)
 - [Running Examples](#running-examples)
-- [Hello Worlds:](#hello-worlds)
-- [Additional Examples:](#additional-examples)
+- [Hello Worlds](#hello-worlds)
+- [Hummingbird Examples](#hummingbird-examples)
+- [Additional Pytorch Examples](#additional-pytorch-examples)
 
 ## Groq Tool Requirements
 
@@ -47,18 +48,25 @@ python /path/to/example/example_name.py
 | `keras/hello_world.py` | building and running a model defined in Keras|
 | `onnx/hello_world.py` | building and running a model defined as an ONNX file|
 
-## Additional PyTorch Examples in `pytorch/` Folder
+## Hummingbird Examples
 
 | **Example Name** | **Demonstrates** |
 |:--------|:-----------|
-| `assembler_flags.py` | the `assembler_flags` argument to `groqit()` |
-| `build_name.py` | the `build_name` argument to `groqit()` |
-|  `cache_dir.py` | the `cache_dir` argument to `groqit()` |
-| `compiler_flags.py` | the `compiler_flags` argument to `groqit()` |
-| `estimate_performance.py` | the performance estimation feature of GroqFlow |
-| `groqview.py` | how to create and open a GroqView visualization using GroqFlow |
-| `no_monitor.py` | the `monitor` argument to `groqit()` |
-| `num_chips.py` | the `num_chips` argument to groqit()|
-| `rebuild_always.py` | `groqit()`'s caching behavior when the `rebuild` argument is set to "always" |
-| `rebuild_never.py` | groqit()'s caching behavior when the `rebuild` argument is set to "never" |
-| `run_abunch.py` | running multiple inputs at a time with the `run_abunch()` method |
+| `hummingbird/randomforest.py` | building and running a Hummingbird RandomForestClassifier against random data |
+| `hummingbird/xgbclassifier.py` | building and running a Hummingbird XGBClassifier against random data |
+
+## Additional PyTorch Examples
+
+| **Example Name** | **Demonstrates** |
+|:--------|:-----------|
+| `pytorch/assembler_flags.py` | the `assembler_flags` argument to `groqit()` |
+| `pytorch/build_name.py` | the `build_name` argument to `groqit()` |
+| `pytorch/cache_dir.py` | the `cache_dir` argument to `groqit()` |
+| `pytorch/compiler_flags.py` | the `compiler_flags` argument to `groqit()` |
+| `pytorch/estimate_performance.py` | the performance estimation feature of GroqFlow |
+| `pytorch/groqview.py` | how to create and open a GroqView visualization using GroqFlow |
+| `pytorch/no_monitor.py` | the `monitor` argument to `groqit()` |
+| `pytorch/num_chips.py` | the `num_chips` argument to groqit()|
+| `pytorch/rebuild_always.py` | `groqit()`'s caching behavior when the `rebuild` argument is set to "always" |
+| `pytorch/rebuild_never.py` | groqit()'s caching behavior when the `rebuild` argument is set to "never" |
+| `pytorch/run_abunch.py` | running multiple inputs at a time with the `run_abunch()` method |

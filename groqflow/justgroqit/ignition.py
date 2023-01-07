@@ -1,4 +1,5 @@
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Union, Dict, Any
+from collections.abc import Collection
 import sys
 import os
 import importlib.machinery
@@ -7,13 +8,14 @@ import types
 import json
 import torch
 from typeguard import typechecked
-import groqflow.common.exceptions as exp
-import groqflow.justgroqit.export as export
-import groqflow.justgroqit.compile as compile
-import groqflow.justgroqit.stage as stage
-import groqflow.common.printing as printing
 import groqflow.common.build as build
 import groqflow.common.cache as cache
+import groqflow.common.exceptions as exp
+import groqflow.common.printing as printing
+import groqflow.justgroqit.compile as compile
+import groqflow.justgroqit.export as export
+import groqflow.justgroqit.stage as stage
+import groqflow.justgroqit.hummingbird as hummingbird
 
 try:
     import tensorflow as tf
@@ -39,6 +41,27 @@ default_pytorch_sequence = stage.Sequence(
     "Building PyTorch Model",
     [
         default_pytorch_export_sequence,
+        compile.CompileOnnx(),
+        compile.Assemble(),
+    ],
+)
+
+pytorch_export_sequence_with_quantization = stage.Sequence(
+    "pytorch_export_sequence_with_quantization",
+    "Exporting PyTorch Model and Quantizating Exported ONNX",
+    [
+        export.ExportPytorchModel(),
+        export.OptimizeOnnxModel(),
+        export.CheckOnnxCompatibility(),
+        export.QuantizeONNXModel(),
+    ],
+)
+
+pytorch_sequence_with_quantization = stage.Sequence(
+    "pytorch_sequence_with_quantization",
+    "Building PyTorch Model",
+    [
+        pytorch_export_sequence_with_quantization,
         compile.CompileOnnx(),
         compile.Assemble(),
     ],
@@ -79,13 +102,23 @@ default_onnx_sequence = stage.Sequence(
     ],
 )
 
+default_hummingbird_sequence = stage.Sequence(
+    "default_hummingbird_sequence",
+    "Building Hummingbird Model",
+    [
+        hummingbird.ConvertHummingbirdModel(),
+        export.OptimizeOnnxModel(),
+        export.CheckOnnxCompatibility(),
+        compile.CompileOnnx(),
+        compile.Assemble(),
+    ],
+)
+
 default_compiler_flags = []
 
 default_assembler_flags = [
-    "--auto-agt",
     "--ifetch-from-self",
-    "--ifetch-slice-ordering",
-    "round-robin",
+    "--ifetch-slice-ordering=round-robin",
 ]
 
 
@@ -225,7 +258,7 @@ def _validate_cached_model(
     current_version_decoded = _decode_version_number(version)
     state_version_decoded = _decode_version_number(state.groqflow_version)
 
-    out_of_date = False
+    out_of_date: Union[str, bool] = False
     if current_version_decoded["major"] > state_version_decoded["major"]:
         out_of_date = "major"
     elif current_version_decoded["minor"] > state_version_decoded["minor"]:
@@ -280,7 +313,9 @@ def _validate_cached_model(
             result.append(msg)
 
         if model_changed:
-            msg = f'Model "{config.build_name}" changed since the last time it was built.'
+            msg = (
+                f'Model "{config.build_name}" changed since the last time it was built.'
+            )
             result.append(msg)
 
         if input_shapes_changed:
@@ -347,6 +382,7 @@ def _begin_fresh_build(
     model_type: build.ModelType,
     corpus: str,
     groqflow_version: str,
+    quantization_samples: Collection,
 ) -> build.State:
     # Wipe this model's directory in the cache and start with a fresh State.
     cache.rmdir(build.output_dir(cache_dir, config.build_name))
@@ -361,6 +397,7 @@ def _begin_fresh_build(
         model_type=model_type,
         corpus=corpus,
         groqflow_version=groqflow_version,
+        quantization_samples=quantization_samples,
     )
     state.save()
 
@@ -391,6 +428,7 @@ def load_or_make_state(
     corpus: str,
     model: build.UnionValidModelInstanceTypes = None,
     inputs: Optional[Dict[str, Any]] = None,
+    quantization_samples: Optional[Collection] = None,
 ) -> build.State:
     """
     Decide whether we can load the model from the GroqFlow model cache
@@ -413,6 +451,7 @@ def load_or_make_state(
         "model_type": model_type,
         "corpus": corpus,
         "groqflow_version": groqflow_version,
+        "quantization_samples": quantization_samples,
     }
 
     if rebuild == "always":
@@ -422,6 +461,51 @@ def load_or_make_state(
         if os.path.isfile(build.state_file(cache_dir, config.build_name)):
             try:
                 state = build.load_state(cache_dir, config.build_name)
+
+                # if the previous build is using quantization while the current is not
+                # or vice versa
+                if state.quantization_samples and quantization_samples is None:
+                    if rebuild == "never":
+                        msg = (
+                            f"Model {config.build_name} was built in a previous call to "
+                            "groqit() with post-training quantization sample enabled."
+                            "However, post-training quantization is not enabled in the "
+                            "current build. Rebuild is necessary but currently the rebuild"
+                            "policy is set to 'never'. "
+                        )
+                        raise exp.GroqitCacheError(msg)
+
+                    msg = (
+                        f"Model {config.build_name} was built in a previous call to "
+                        "groqit() with post-training quantization sample enabled."
+                        "However, post-training quantization is not enabled in the "
+                        "current build. Starting a fresh build."
+                    )
+
+                    printing.log_info(msg)
+                    return _begin_fresh_build(**state_args)
+
+                if not state.quantization_samples and quantization_samples is not None:
+                    if rebuild == "never":
+                        msg = (
+                            f"Model {config.build_name} was built in a previous call to "
+                            "groqit() with post-training quantization sample disabled."
+                            "However, post-training quantization is enabled in the "
+                            "current build. Rebuild is necessary but currently the rebuild"
+                            "policy is set to 'never'. "
+                        )
+                        raise exp.GroqitCacheError(msg)
+
+                    msg = (
+                        f"Model {config.build_name} was built in a previous call to "
+                        "groqit() with post-training quantization sample disabled."
+                        "However, post-training quantization is enabled in the "
+                        "current build. Starting a fresh build."
+                    )
+
+                    printing.log_info(msg)
+                    return _begin_fresh_build(**state_args)
+
             except exp.GroqitStateError as e:
                 problem = (
                     "- groqit() failed to load "
@@ -568,6 +652,11 @@ model_type_to_sequence = {
     build.ModelType.PYTORCH: default_pytorch_sequence,
     build.ModelType.KERAS: default_keras_sequence,
     build.ModelType.ONNX_FILE: default_onnx_sequence,
+    build.ModelType.HUMMINGBIRD: default_hummingbird_sequence,
+}
+
+model_type_to_sequence_with_quantization = {
+    build.ModelType.PYTORCH: pytorch_sequence_with_quantization,
 }
 
 
@@ -607,6 +696,7 @@ def model_intake(
     user_inputs,
     user_sequence: Optional[stage.Sequence],
     config: build.Config,
+    user_quantization_samples: Optional[Collection] = None,
 ) -> Tuple[Any, Any, stage.Sequence, build.ModelType, str]:
 
     # Model intake structure options:
@@ -625,6 +715,8 @@ def model_intake(
     #    |------- pytorch model object
     #    |
     #    |------- keras model object
+    #    |
+    #    |------- Hummingbird-supported model object
 
     if user_sequence is None or user_sequence.enable_model_validation:
 
@@ -663,17 +755,25 @@ def model_intake(
                     "Keras model has not been built. Please call "
                     "model.build(input_shape) before running groqit()"
                 )
+        elif hummingbird.is_supported_model(model):
+            model_type = build.ModelType.HUMMINGBIRD
         else:
             raise exp.GroqitIntakeError(
                 "Argument 'model' passed to groqit() is "
                 f"of unsupported type {type(model)}"
             )
 
-        if user_sequence is None:
+        sequence = user_sequence
+        if sequence is None:
             # Assign a sequence based on the ModelType
-            sequence = model_type_to_sequence[model_type]
-        else:
-            sequence = user_sequence
+            if user_quantization_samples:
+                if model_type != build.ModelType.PYTORCH:
+                    raise exp.GroqitIntakeError(
+                        "Currently, post training quantization only supports Pytorch models."
+                    )
+                sequence = model_type_to_sequence_with_quantization[model_type]
+            else:
+                sequence = model_type_to_sequence[model_type]
 
         if "--auto-asm" in config.compiler_flags:
             sequence.stages = [

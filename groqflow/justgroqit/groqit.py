@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict, Any
+from collections.abc import Collection
 import groqflow.justgroqit.ignition as ignition
 import groqflow.groqmodel as groqmodel
 import groqflow.justgroqit.stage as stage
@@ -18,6 +19,7 @@ def groqit(
     num_chips: Optional[int] = None,
     groqview: bool = False,
     sequence: Optional[List[stage.GroqitStage]] = None,
+    quantization_samples: Collection = None,
 ) -> groqmodel.GroqModel:
 
     """Use GroqFlow to build a model instance into a GroqModel
@@ -56,6 +58,12 @@ def groqit(
             significant time and compute/RAM resources.
         sequence: Override groqit's default sequence of build stages. Power
             users only.
+        quantization_samples: If set, performs post-training quantization
+            on the ONNX model using the provided samples, then generates
+            GroqModel from the quantized model. If the previous build used samples
+            that are different to the samples used in current build, the "rebuild"
+            argument needs to be manually set to "always" in the current build
+            in order to create a new GroqModel.
     """
     # Validate and lock in the groqit() config (user arguments that
     # configure the build) that will be used by the rest of groqit()
@@ -76,7 +84,13 @@ def groqit(
         sequence_locked,
         model_type,
         corpus,
-    ) = ignition.model_intake(model, inputs, sequence, config)
+    ) = ignition.model_intake(
+        model,
+        inputs,
+        sequence,
+        config,
+        user_quantization_samples=quantization_samples,
+    )
 
     # Get the state of the model from the GroqFlow cache if a valid build is available
     state = ignition.load_or_make_state(
@@ -89,6 +103,7 @@ def groqit(
         corpus=corpus,
         model=model_locked,
         inputs=inputs_locked,
+        quantization_samples=quantization_samples,
     )
 
     # Return a cached build if possible, otherwise prepare the model State for
@@ -102,6 +117,8 @@ def groqit(
         )
 
         return groqmodel.load(config.build_name, state.cache_dir)
+
+    state.quantization_samples = quantization_samples
 
     sequence_locked.show_monitor(config, state.monitor)
     state = sequence_locked.launch(state)

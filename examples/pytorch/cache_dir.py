@@ -40,9 +40,7 @@ inputs = {"x": torch.rand(input_size)}
 # Build pytorch_model and set the cache_dir
 # We also set the build_name to make the build easy to identify
 my_local_cache = "local_cache"
-groqit(
-    pytorch_model, inputs, cache_dir=my_local_cache, build_name="my_cache_dir_build"
-)
+groqit(pytorch_model, inputs, cache_dir=my_local_cache, build_name="my_cache_dir_build")
 
 print(
     f"\nCheck out the cache created in the local directory by running 'ls {my_local_cache}'"

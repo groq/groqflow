@@ -131,12 +131,8 @@ if __name__ == "__main__":
         help="Number of chips used to build the model",
     )
     parser.add_argument("output_dir", help="Path where the build files are stored")
-    parser.add_argument(
-        "outputs_file", help="File in which the outputs will be saved"
-    )
-    parser.add_argument(
-        "latency_file", help="File in which the latency will be saved"
-    )
+    parser.add_argument("outputs_file", help="File in which the outputs will be saved")
+    parser.add_argument("latency_file", help="File in which the latency will be saved")
     parser.set_defaults(bringup_topology=False)
     parser.add_argument("topology", help="GroqChip topology used when building model")
     parser.add_argument(

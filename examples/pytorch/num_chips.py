@@ -19,9 +19,9 @@ from groqflow import groqit
 torch.manual_seed(0)
 
 # Define model class
-class TwoNodeModel(torch.nn.Module):
+class TwoLayerModel(torch.nn.Module):
     def __init__(self, input_size, output_size):
-        super(TwoNodeModel, self).__init__()
+        super(TwoLayerModel, self).__init__()
         self.fc1 = torch.nn.Linear(input_size, output_size)
         self.fc2 = torch.nn.Linear(output_size, output_size)
 
@@ -34,7 +34,7 @@ class TwoNodeModel(torch.nn.Module):
 # Create model and inputs
 input_size = 10
 output_size = 5
-pytorch_model = TwoNodeModel(input_size, output_size)
+pytorch_model = TwoLayerModel(input_size, output_size)
 inputs = {"x": torch.rand(input_size)}
 
 # Build model for 2 chips

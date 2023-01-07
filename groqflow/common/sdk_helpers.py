@@ -17,8 +17,8 @@ import groqflow.common.printing as printing
 # Older than min release version fails
 # Not equal to current release version is unsupported and warns
 # but may still work
-MIN_RELEASE_VERSION = "0.9.1"
-CURRENT_RELEASE_VERSION = "0.9.1"
+MIN_RELEASE_VERSION = "0.9.2"
+CURRENT_RELEASE_VERSION = "0.9.2"
 VALID_VERSIONS = [CURRENT_RELEASE_VERSION, "test"]
 
 
@@ -40,9 +40,7 @@ def get_num_chips_available(pci_devices=None):
 
     # Capture the list of pci devices on the system using the linux lspci utility
     if pci_devices is None:
-        pci_devices = (
-            subprocess.check_output([lspci, "-n"]).decode("utf-8").split("\n")
-        )
+        pci_devices = subprocess.check_output([lspci, "-n"]).decode("utf-8").split("\n")
 
     # Unique registered vendor id: 1de0, and device id: "0000"
     groq_card_id = "1de0:0000"
@@ -160,6 +158,14 @@ def version_is_valid(
                 printing.log_warning(msg)
         else:
             return False
+    # User has a release candidate installed
+    elif is_release_candidate(sdkv):
+        msg = (
+            "This machine has a GroqWare SDK release candidate installed. "
+            "If you encounter unexpected behavior, please try again with the "
+            f"officially supported SDK version, {CURRENT_RELEASE_VERSION}."
+        )
+        printing.log_warning(msg)
 
     # Package found and has a valid version
     return True

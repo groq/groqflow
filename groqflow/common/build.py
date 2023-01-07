@@ -5,11 +5,13 @@ import copy
 import enum
 import math
 from typing import Optional, Any, List, Dict, Union
+from collections.abc import Collection
 import dataclasses
 import hashlib
 import yaml
 import torch
 import numpy as np
+import sklearn.base
 import groqflow.common.exceptions as exp
 
 try:
@@ -27,6 +29,7 @@ UnionValidModelInstanceTypes = Union[
     torch.nn.Module,
     torch.jit.ScriptModule,
     tf.keras.Model,
+    sklearn.base.BaseEstimator,
 ]
 
 
@@ -97,6 +100,7 @@ class ModelType(enum.Enum):
     PYTORCH = "pytorch"
     KERAS = "keras"
     ONNX_FILE = "onnx_file"
+    HUMMINGBIRD = "hummingbird"
     UNKNOWN = "unknown"
 
 
@@ -199,6 +203,11 @@ def hash_model(model, model_type: ModelType, hash_params: bool = True):
         # Return hash of topology and parameters
         return hashlib.sha256(hashable_model).hexdigest()
 
+    elif model_type == ModelType.HUMMINGBIRD:
+        import pickle
+
+        return hashlib.sha256(pickle.dumps(model)).hexdigest()
+
     else:
         msg = f"""
         model_type "{model_type}" unsupported by groqit's hash_model function
@@ -296,12 +305,15 @@ class Info:
     opt_onnx_unsupported_ops: Optional[List[str]] = None
     opt_onnx_all_ops_supported: Optional[bool] = None
     converted_onnx_exported: Optional[bool] = None
+    quantized_onnx_exported: Optional[bool] = None
     compiler_success: Optional[bool] = None
     compiler_command: Optional[str] = None
     assembler_success: Optional[bool] = None
     assembler_command: Optional[str] = None
     measured_latency: Optional[float] = None
     measured_throughput: Optional[float] = None
+    estimated_latency: Optional[float] = None
+    estimated_throughput: Optional[float] = None
     skipped_stages: int = 0
     opset: Optional[int] = DEFAULT_ONNX_OPSET
     compiled_onnx_input_bytes: int = None
@@ -353,11 +365,14 @@ class State:
     build_status: Status = Status.NOT_STARTED
     expected_input_shapes: Optional[Dict[str, list]] = None
     expected_input_dtypes: Optional[Dict[str, list]] = None
+    expected_output_names: Optional[List] = None
     # The results of the most recent stage that was executed
     intermediate_results: Any = None
     # Folder a model file was found in. Useful for processing
     # large quantities of models.
     corpus: str = ""
+
+    quantization_samples: Optional[Collection] = None
 
     def __post_init__(self):
         if self.uid is None:
@@ -378,6 +393,9 @@ class State:
         # Always automatically save the state.yaml whenever State is modified
         # But don't bother saving until after __post_init__ is done (indicated
         # by the after_post_init flag)
+        # Note: This only works when elements of the state are set directly.
+        # When an element of state.info gets set, for example, state needs
+        # to be explicitly saved by calling state.save().
         if self.after_post_init and name != "after_post_init":
             self.save()
 
@@ -407,9 +425,7 @@ class State:
 
     @property
     def onnx_dir(self):
-        return os.path.join(
-            output_dir(self.cache_dir, self.config.build_name), "onnx"
-        )
+        return os.path.join(output_dir(self.cache_dir, self.config.build_name), "onnx")
 
     @property
     def base_onnx_file(self):
@@ -430,6 +446,13 @@ class State:
         return os.path.join(
             self.onnx_dir,
             f"{self.config.build_name}-op{self.info.opset}-opt-f16.onnx",
+        )
+
+    @property
+    def quantized_onnx_file(self):
+        return os.path.join(
+            self.onnx_dir,
+            f"{self.config.build_name}-op{self.info.opset}-opt-quantized_int8.onnx",
         )
 
     @property
@@ -495,15 +518,24 @@ class State:
 
         state_dict["info"]["backend"] = self.info.backend.value
 
+        # During actual execution, quantization_samples in the state
+        # stores the actual quantization samples.
+        # However, we do not save quantization samples
+        # Instead, we save a boolean to indicate whether the model
+        # stored has been quantized by some samples.
+        for key, value in vars(self).items():
+            if key == "quantization_samples" and value is not None:
+                state_dict["quantization_samples"] = True
+            else:
+                state_dict["quantization_samples"] = False
+
         with open(
             state_file(self.cache_dir, self.config.build_name), "w", encoding="utf8"
         ) as outfile:
             yaml.dump(state_dict, outfile)
 
 
-def load_state(
-    cache_dir=DEFAULT_CACHE_DIR, build_name=None, state_path=None
-) -> State:
+def load_state(cache_dir=DEFAULT_CACHE_DIR, build_name=None, state_path=None) -> State:
     if state_path is not None:
         file_path = state_path
     elif build_name is not None:

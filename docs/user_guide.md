@@ -15,6 +15,7 @@ The following reviews the different functionality provided by GroqFlow.
   - [Compiler Flags](#compiler-flags)
   - [Assembler Flags](#assembler-flags)
   - [Choose a Cache Directory](#choose-a-cache-directory)
+  - [Perform Post-training Quantization](#perform-post-training-quantization)
 - [GroqModel Methods](#groqmodel-methods)
   - [GroqModel Class](#groqmodel-class)
   - [GroqModel Specializations](#groqmodel-specializations)
@@ -44,7 +45,7 @@ gmodel(**inputs)                # inference with provided inputs
 
 The simplest way to use GroqFlow is by calling `groqit()` with your model and a sample input.
 
-Returns a callable `GroqModel` instance that works like a PyTorch model (torch.nn.Module).
+Returns a callable `GroqModel` instance that works like a PyTorch model (torch.nn.Module) or, when given scikit-learn or xgboost inputs, has `predict` and `predict_proba` methods.
 
 **model:**
 
@@ -54,6 +55,24 @@ Returns a callable `GroqModel` instance that works like a PyTorch model (torch.n
   - Keras model (tf.keras.Model)
   - TorchScript model (torch.jit.ScriptModule)
   - ONNX model (path/to/.onnx)
+  - The following scikit-learn models:
+    - sklearn.ensemble.ExtraTreesClassifier
+    - sklearn.ensemble.GradientBoostingClassifier
+    - sklearn.ensemble.IsolationForest
+    - sklearn.ensemble.RandomForestClassifier
+    - sklearn.ensemble.RandomForestRegressor
+    - sklearn.linear_model.SGDClassifier
+    - sklearn.naive_bayes.BernoulliNB
+    - sklearn.naive_bayes.GaussianNB
+    - sklearn.naive_bayes.MultinomialNB
+    - sklearn.neural_network.MLPClassifier
+    - sklearn.pipeline.Pipeline
+    - sklearn.preprocessing.StandardScaler
+    - sklearn.svm.LinearSVC
+    - sklearn.tree.DecisionTreeClassifier
+  - The following xgboost models:
+    - xgboost.XGBClassifier
+    - xgboost.XGBRegressor
 
 **inputs:**
 
@@ -286,6 +305,27 @@ See: `examples/pytorch/cache_dir.py`
 
 ---
 
+### Perform Post Training Quantization
+
+By default, `groqit()` converts the input model into an equivalent ONNX model, optimizes the ONNX model, and converts the model's trained parameters into type float16 before compiling and assembling the model into a groq model.
+
+When quantization data samples are specified to the `quantization_samples` argument, `groqit()` performs post-training quantization to int8 on the equivalent ONNX model using the specified samples, before compiling and assembling a GroqModel from the quantized ONNX model. The provided unlabeled samples are used to estimate distribution statistics of the data to pre-compute scales and zero points of the float-to-int8 range mapping for the activation tensors in the model. After static quantization, all conv, matmul, and relu operations in the quantized model will have int8 precision. Please note that rebuild is required when different quantization samples are provided, so the rebuild policy in this case must be set to `always`.
+
+Currently, `groqit()` only provides post training quantization support for PyTorch models.
+
+**quantization_samples**
+- A list of data samples to be used to perform post-training quantization to the input model, specified by `groqit(quantization_samples=my_samples, ...)`. Each sample should be a numpy array or similar object
+
+### Examples:
+
+```
+gmodel = groqit(model, inputs, quantization_samples=my_samples)
+```
+
+See: `examples/pytorch/quantization.py`
+
+---
+
 ## GroqModel Methods
 
 ### GroqModel Class
@@ -307,7 +347,7 @@ gmodel = groqit(pytorch_model, inputs)
 ### GroqModel Specializations
 
 ONNX models built with `groqit()` return a standard `GroqModel` instance.
- - Tensors returned by `GroqModel` are of type `np.array`
+ - Tensors returned by `GroqModel` are of type `numpy.ndarray`
 
 PyTorch and TorchScript models built with `groqit()` return an instance of `class PytorchModelWrapper(GroqModel)`, which is the same as a `GroqModel` except:
  - `PytorchModelWrapper` is a callable object, similar to `torch.nn.Module` (i.e., `__call__()` executes the model's forward function)
@@ -316,6 +356,12 @@ PyTorch and TorchScript models built with `groqit()` return an instance of `clas
 Keras models built with `groqit()` return an instance of `class KerasModelWrapper(GroqModel)`, which is the same as a `GroqModel` except:
  - `KerasModelWrapper` is a callable object, similar to `tf.keras.Model` (i.e., `__call__()` executes the model's call function)
  - Tensors returned by `KerasModelWrapper` will be of type `tf.Tensor`
+
+scikit-learn and xgboost models built with `groqit()` return an instance of `class HummingbirdWrapper(GroqModel)`, which is the same as a `GroqModel` except:
+ - There is a `predict` method returning estimator/classifier results mimicking the `predict` method of scikit-learn
+ - There is a `predict_proba` method returning probabilities mimicking the `predict_proba` method of scikit-learn
+ - The `run` method returns two outputs corresponding to the results of `predict` and `predict_proba`.
+ - Tensors returned by `GroqModel` are of type `numpy.ndarray`
 
 ---
 
@@ -331,6 +377,9 @@ Keras models built with `groqit()` return an instance of `class KerasModelWrappe
 **`PytorchModelWrapper.__call__(**kwargs)`**
 - A `GroqModel` based on a PyTorch model is callable like a PyTorch model
 - The `inputs` argument is an unpacked dictionary where the keys correspond to the arguments of your model's forward function
+
+**`HummingbirdWrapper.predict(inputs: numpy.ndarray)`**
+- Predictions from a `GroqModel` based on a scikit-learn or xgboost model can be produced with the `predict` method.
 
 ### Example:
 
@@ -350,6 +399,8 @@ See:
  - `examples/pytorch/hello_world.py`
  - `examples/keras/hello_world.py`
  - `examples/onnx/hello_world.py`
+ - `examples/hummingbird/xgbclassifier.py`
+ - `examples/hummingbird/randomforest.py`
 
 
 ---
