@@ -20,7 +20,7 @@ The following reviews the different functionality provided by GroqFlow.
   - [GroqModel Class](#groqmodel-class)
   - [GroqModel Specializations](#groqmodel-specializations)
   - [Calling an Inference](#inference-forward-pass)
-  - [Benchmarking the Model](#benchmark)
+  - [Benchmarking the Model](#benchmarking-the-model)
   - [Netron](#netron)
   - [Open a GroqView Visualization](#open-a-groqview-visualization)
 - [Concepts](#concepts)
@@ -434,7 +434,7 @@ See: `examples/pytorch/run_abunch.py`
 
 ---
 
-### Performance Estimation
+### Benchmarking the Model
 
 `GroqModel` provides a method, `GroqModel.estimate_performance()`, to help you understand the throughput and latency of your build. We implemented this method because `GroqModel` is not yet optimized for your performance.
 
