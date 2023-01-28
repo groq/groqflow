@@ -33,10 +33,19 @@ except ModuleNotFoundError as module_error:
 
 @dataclass
 class GroqEstimatedPerformance:
-    latency: float
-    throughput: float
+    pcie_input_latency: float
+    compute_latency: float
+    pcie_output_latency: float
     latency_units: str = "seconds"
     throughput_units: str = "inferences per second"
+
+    @property
+    def latency(self) -> float:
+        return self.pcie_input_latency + self.compute_latency + self.pcie_output_latency
+
+    @property
+    def throughput(self) -> float:
+        return 1.0 / self.latency
 
 
 @dataclass
@@ -51,8 +60,7 @@ class GroqMeasuredPerformance:
 
     @property
     def throughput(self):
-        # TODO: Implement throughput property once benchmark() is implemented
-        return None
+        return 1 / self.latency
 
 
 # An object of this class creates a state
@@ -142,32 +150,32 @@ class GroqModel:
         pcie_bandwidth = 24e9  # 24 GB/s
 
         # Calculate compute latency and estimate PCIe latency
-        estimated_pcie_input_latency = (
+        self.state.info.estimated_pcie_input_latency = (
             self.state.info.compiled_onnx_input_bytes / pcie_bandwidth
         ) + pcie_latency
-        compute_latency = on_chip_compute_cycles / (frequency)
-        estimated_pcie_output_latency = (
+        self.state.info.deterministic_compute_latency = on_chip_compute_cycles / (
+            frequency
+        )
+        self.state.info.estimated_pcie_output_latency = (
             self.state.info.compiled_onnx_output_bytes / pcie_bandwidth
         ) + pcie_latency
 
         # When pipelined, the reported cycle is the duration of a single pipelining stage
         # Note: Models are pipelined by default
         if not "--no-multichip-pipelining" in self.state.config.compiler_flags:
-            compute_latency = compute_latency * self.state.num_chips_used
+            self.state.info.deterministic_compute_latency *= self.state.num_chips_used
 
-        estimated_total_latency = (
-            estimated_pcie_input_latency
-            + compute_latency
-            + estimated_pcie_output_latency
+        # Save estimated perm
+        estimated_perf = GroqEstimatedPerformance(
+            pcie_input_latency=self.state.info.estimated_pcie_input_latency,
+            compute_latency=self.state.info.deterministic_compute_latency,
+            pcie_output_latency=self.state.info.estimated_pcie_output_latency,
         )
-
-        estimated_throughput = 1.0 / estimated_total_latency
-
-        self.state.info.estimated_latency = estimated_total_latency
-        self.state.info.estimated_throughput = estimated_throughput
+        self.state.info.estimated_latency = estimated_perf.latency
+        self.state.info.estimated_throughput = estimated_perf.throughput
         self.state.save()
 
-        return GroqEstimatedPerformance(estimated_total_latency, estimated_throughput)
+        return estimated_perf
 
     def benchmark(
         self, inputs: Optional[Dict] = None, repetitions: int = 100

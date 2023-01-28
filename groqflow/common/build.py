@@ -283,6 +283,7 @@ class Config:
     assembler_flags: List[str]
     groqview: bool
     groqcard: Groqcard
+    sequence: List[str]
     num_chips: Optional[int] = None
 
 
@@ -312,8 +313,11 @@ class Info:
     assembler_command: Optional[str] = None
     measured_latency: Optional[float] = None
     measured_throughput: Optional[float] = None
-    estimated_latency: Optional[float] = None
+    estimated_pcie_input_latency: Optional[float] = None
+    deterministic_compute_latency: Optional[float] = None
+    estimated_pcie_output_latency: Optional[float] = None
     estimated_throughput: Optional[float] = None
+    estimated_latency: Optional[float] = None
     skipped_stages: int = 0
     opset: Optional[int] = DEFAULT_ONNX_OPSET
     compiled_onnx_input_bytes: int = None

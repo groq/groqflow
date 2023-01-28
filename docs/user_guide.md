@@ -434,15 +434,51 @@ See: `examples/pytorch/run_abunch.py`
 
 ---
 
+### Benchmark
+
+`GroqModel` provides a pair of methods, `GroqModel.benchmark()` and `GroqModel.benchmark_abunch()`, which benchmark the performance of your build on a GroqNode system.
+
+These methods are useful for understanding the realized performance of GroqNode systems using today's end-to-end Groq software stack, however please note that today's software stack is not fully optimized. We provide a [performance estimation](#performance-estimation) method to provide an upper-bound analysis of fully optimized performance. You should expect to see identical compute performance between `benchmark()` and `estimate_performance()`, however the amount of time spent on PCIe invocation and transfers will typically be less with `estimate_performance()`.
+
+Both methods take an optional `repetitions` argument, which determines the number of benchmarking samples to run. The reported results are the average over the samples.
+
+The distinction between `benchmark()` and `benchmark_abunch()` is:
+- `benchmark()` takes an optional `inputs` argument, which is benchmarked `repetitions` times. If no `inputs` are provided, `benchmark()` uses a saved copy of the `inputs` provided to `groqit()`. `repetitions` defaults to 100, meaning the result is the average of benchmarking the `inputs` 100 times.
+- `benchmark_abunch()` takes a collection of inputs (see [`run_abunch()`](#multiple-inferences)) and executes each member of the collection `repetitions` times. `repetitions` defaults to 1, meaning the result is the average of benchmarking each member in the collection once.
+
+Note that `benchmark()` and `benchmark_abunch()` should return nearly identical performance results, regardless of the `inputs` or `input_collection` provided, because GroqChip has a deterministic architecture. `benchmark_abunch()` is primarily useful for:
+- Convincing yourself that Groq's architecture is deterministic, by observing low variance between the performance of different inputs
+  - Note: Groq systems should show low performance variance between different inputs because compute performance on Groq systems is completely deterministic. All performance variance comes from I/O between the host system and GroqChip processors.
+- Aiding with comparisons of other architectures, which are non-deterministic, and would show their performance vary between different inputs
+
+Both methods return a `GroqMeasuredPerformance` object, which has members for:
+- `latency` in seconds.
+- `throughput` in inferences per second (IPS).
+
+### Example:
+
+```
+>>> gmodel.benchmark().latency
+  0.001
+
+>>> gmodel.benchmark().throughput
+  1000
+```
+
+See: `examples/pytorch/benchmark.py`
+See: `examples/pytorch/benchmark_abunch.py`
+
+---
+
 ### Performance Estimation
 
-`GroqModel` provides a method, `GroqModel.estimate_performance()`, to help you understand the throughput and latency of your build. We implemented this method because `GroqModel` is not yet optimized for your performance.
+`GroqModel` provides a method, `GroqModel.estimate_performance()`, to help you understand the throughput and latency of your build. We implemented this method because `GroqModel` is not yet optimized for your performance (see [benchmarking](#benchmark) for details).
 
 `estimate_performance()` estimates performance as the sum of:
  - The exact (deterministic) amount of time it will take for GroqChip processors to perform the computation for your model.
  - An estimate of the amount of time the PCIe bus will take to transfer your inputs from CPU memory to GroqChip processor and retrieve your results back in CPU memory.
 
-`estimate_performance()` returns a `GroqEstimatedPerformance`, which has members for:
+`estimate_performance()` returns a `GroqEstimatedPerformance` object, which has members for:
  - `latency` in seconds.
  - `throughput` in inferences per second (IPS).
 

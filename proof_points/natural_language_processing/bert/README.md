@@ -35,6 +35,12 @@ To build and evaluate BERT-base:
   python bert_base.py
   ```
 
+  To build and evaluate BERT-quantized:
+
+  ```bash
+  python bert_quantize.py
+  ```
+
 Note: The Proof Points directory [readme.md](../../README.md) details how to build and execute on two machines.
 
 ## Expected Results
@@ -45,3 +51,4 @@ Note: The Proof Points directory [readme.md](../../README.md) details how to bui
 |:-----------|:--------|:---------|:----------|
 | BERT-tiny | 1 min | 30 sec | 1 |
 | BERT-base | 15 min | 4 min | 4 |
+| BERT-quantize | 15 min | 4 min | 4 |

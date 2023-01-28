@@ -3,12 +3,6 @@ import groqflow.justgroqit.stage as stage
 import groqflow.justgroqit.export as export
 import groqflow.common.exceptions as exp
 
-import hummingbird.ml  # pylint: disable=import-error
-from hummingbird.ml.exceptions import (  # pylint: disable=import-error
-    ConstantError,
-    MissingConverter,
-    MissingBackend,
-)
 import onnx
 import onnx.tools.update_model_dims
 import numpy as np
@@ -93,6 +87,14 @@ class ConvertHummingbirdModel(stage.GroqitStage):
         )
 
     def fire(self, state: build.State):
+        # TODO: Temporarily inlined to avoid warning message in hummingbird-ml<=0.46.
+        import hummingbird.ml  # pylint: disable=import-error
+        from hummingbird.ml.exceptions import (  # pylint: disable=import-error
+            ConstantError,
+            MissingConverter,
+            MissingBackend,
+        )
+
         if not is_supported_model(state.model):
             msg = f"""
             The current stage (ConvertHummingbirdModel) is only compatible with

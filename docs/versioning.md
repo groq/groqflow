@@ -1,6 +1,6 @@
 # GroqFlow Versioning Policy
 
-The `groqflow` package applies semantic versioning for its 3-digit version number. The version number is stored in `groqflow/version.json`.
+The `groqflow` package applies semantic versioning for its 3-digit version number. The version number is stored in `groqflow/version.py`.
 
 The 3 digits correspond to MAJOR.MINOR.PATCH, which can be interpreted as follows:
 * MAJOR: changes indicate breaking API changes that may require the user to change their own code
