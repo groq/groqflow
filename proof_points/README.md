@@ -44,6 +44,7 @@ The following relates the proof point models with the version of the GroqWare Su
 | [MobileNetV2](computer_vision/mobilenetv2/) | 0.9.2
 | [ResNet50](computer_vision/resnet50/) | 0.9.2
 | [SqueezeNet](computer_vision/squeezenet/) | 0.9.2
+| [Yolo v6](computer_vision/yolo/) | 0.9.2
 
 ### Natural Language Processing
 
@@ -51,6 +52,7 @@ The following relates the proof point models with the version of the GroqWare Su
 |:------------------|:------------------------|
 | [Bert Tiny](natural_language_processing/bert/) | 0.9.2
 | [Bert Base](natural_language_processing/bert/) | 0.9.2
+| [Bert Quantized](natural_language_processing/bert/) | 0.9.2
 | [DistilBERT](natural_language_processing/distilbert/) | 0.9.2
 | [ELECTRA](natural_language_processing/electra/) | 0.9.2
 | [MiniLM v2](natural_language_processing/minilm/) | 0.9.2

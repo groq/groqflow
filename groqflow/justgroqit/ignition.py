@@ -5,7 +5,6 @@ import os
 import importlib.machinery
 import pathlib
 import types
-import json
 import torch
 from typeguard import typechecked
 import groqflow.common.build as build
@@ -16,6 +15,7 @@ import groqflow.justgroqit.compile as compile
 import groqflow.justgroqit.export as export
 import groqflow.justgroqit.stage as stage
 import groqflow.justgroqit.hummingbird as hummingbird
+from groqflow import __version__ as groqflow_version
 
 try:
     import tensorflow as tf
@@ -191,6 +191,7 @@ def lock_config(
     groqview: bool = False,
     groqcard: Optional[build.Groqcard] = build.Groqcard.A14,
     num_chips: Optional[int] = None,
+    sequence: stage.Sequence = None,
 ) -> Tuple[build.Config, bool]:
 
     """
@@ -223,6 +224,13 @@ def lock_config(
     if assembler_flags is None:
         assembler_flags = default_assembler_flags
 
+    if sequence is None:
+        # The value ["default"] indicates that groqit will be assigning some
+        # default sequence later in the program
+        stage_names = ["default"]
+    else:
+        stage_names = sequence.get_names()
+
     # Store the args that should be immutable
     config = build.Config(
         build_name=build_name,
@@ -231,6 +239,7 @@ def lock_config(
         groqview=groqview,
         groqcard=groqcard,
         num_chips=num_chips,
+        sequence=stage_names,
     )
 
     return config, auto_name
@@ -357,15 +366,6 @@ def _validate_cached_model(
     return result
 
 
-def _get_version_number():
-    params_file = pathlib.Path(__file__).parent.resolve().parent / "version.json"
-    with open(params_file, "r", encoding="utf8") as stream:
-        json_data = stream.read()
-        params = json.loads(json_data)
-
-    return params["version"]
-
-
 def _decode_version_number(version: str) -> Dict[str, int]:
     numbers = [int(x) for x in version.split(".")]
     return {"major": numbers[0], "minor": numbers[1], "patch": numbers[0]}
@@ -435,8 +435,6 @@ def load_or_make_state(
     (return a valid State instance) or whether we need to rebuild it (return
     a new State instance).
     """
-
-    groqflow_version = _get_version_number()
 
     # Put all the args for making a new State instance into a dict
     # to help the following code be cleaner
@@ -691,6 +689,37 @@ def _validate_inputs(inputs: Dict, model_dot_py_used: bool):
         raise exp.GroqitIntakeError(msg)
 
 
+def identify_model_type(model) -> build.ModelType:
+    # Validate that the model's type is supported by groqit()
+    # and assign a ModelType tag
+    if isinstance(model, (torch.nn.Module, torch.jit.ScriptModule)):
+        model_type = build.ModelType.PYTORCH
+    elif isinstance(model, str):
+        if model.endswith(".onnx"):
+            model_type = build.ModelType.ONNX_FILE
+    elif isinstance(model, tf.keras.Model):
+        model_type = build.ModelType.KERAS
+        if not tf.executing_eagerly():
+            raise exp.GroqitIntakeError(
+                "`groqit()` requires Keras models to be run in eager execution mode. "
+                "Enable eager execution to continue."
+            )
+        if not model.built:
+            raise exp.GroqitIntakeError(
+                "Keras model has not been built. Please call "
+                "model.build(input_shape) before running groqit()"
+            )
+    elif hummingbird.is_supported_model(model):
+        model_type = build.ModelType.HUMMINGBIRD
+    else:
+        raise exp.GroqitIntakeError(
+            "Argument 'model' passed to groqit() is "
+            f"of unsupported type {type(model)}"
+        )
+
+    return model_type
+
+
 def model_intake(
     user_model,
     user_inputs,
@@ -736,32 +765,7 @@ def model_intake(
             model, inputs, corpus = user_model, user_inputs, ""
             model_dot_py_used = False
 
-        # Validate that the model's type is supported by groqit()
-        # and assign a ModelType tag
-        if isinstance(model, (torch.nn.Module, torch.jit.ScriptModule)):
-            model_type = build.ModelType.PYTORCH
-        elif isinstance(model, str):
-            if model.endswith(".onnx"):
-                model_type = build.ModelType.ONNX_FILE
-        elif isinstance(model, tf.keras.Model):
-            model_type = build.ModelType.KERAS
-            if not tf.executing_eagerly():
-                raise exp.GroqitIntakeError(
-                    "`groqit()` requires Keras models to be run in eager execution mode. "
-                    "Enable eager execution to continue."
-                )
-            if not model.built:
-                raise exp.GroqitIntakeError(
-                    "Keras model has not been built. Please call "
-                    "model.build(input_shape) before running groqit()"
-                )
-        elif hummingbird.is_supported_model(model):
-            model_type = build.ModelType.HUMMINGBIRD
-        else:
-            raise exp.GroqitIntakeError(
-                "Argument 'model' passed to groqit() is "
-                f"of unsupported type {type(model)}"
-            )
+        model_type = identify_model_type(model)
 
         sequence = user_sequence
         if sequence is None:

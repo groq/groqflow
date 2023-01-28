@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
+import timeit
 
 import numpy as np
 import onnxruntime
@@ -19,17 +20,53 @@ class PerformanceResult:
     total_number_of_samples: int
     predictions: List = field(repr=False)
 
+    on_chip_latency_ms: float = 0
+    end_to_end_latency_ms: Optional[float] = None
+
+    @property
+    def on_chip_latency_s(self) -> float:
+        return self.on_chip_latency_ms / 1000.0 if self.on_chip_latency_ms else None
+
+    @property
+    def on_chip_ips(self) -> float:
+        return (
+            1000.0 / self.on_chip_latency_ms * self.batch_size
+            if self.on_chip_latency_ms
+            else None
+        )
+
+    @property
+    def end_to_end_latency_s(self) -> float:
+        return (
+            self.end_to_end_latency_ms / 1000.0 if self.end_to_end_latency_ms else None
+        )
+
+    @property
+    def end_to_end_ips(self) -> float:
+        return (
+            1000.0 / self.end_to_end_latency_ms * self.batch_size
+            if self.end_to_end_latency_ms
+            else None
+        )
+
 
 def generate_result_comparison_table(
-    performance_result: List[PerformanceResult], dataset: Dataset, task: str
+    performance_result: List[PerformanceResult],
+    dataset: Dataset,
+    task: str,
 ) -> List[Tuple]:
     pretty_table = PrettyTable()
     row_data = []
 
     score_label = resolve_score_label(task)
+
     pretty_table.field_names = [
         "Source",
         score_label,
+        "end-to-end latency (ms)",
+        "end-to-end IPS",
+        "on-chip latency (ms)",
+        "on-chip IPS",
     ]
 
     for performance in performance_result:
@@ -38,10 +75,24 @@ def generate_result_comparison_table(
         else:
             prediction = np.concatenate(performance.predictions, axis=0)
         score = formatted_score(prediction, dataset, task=task)
+
+        on_chip_latency_ms = (
+            f"{performance.on_chip_latency_ms:.2f}"
+            if performance.on_chip_latency_ms
+            else "--"
+        )
+        on_chip_ips = (
+            f"{performance.on_chip_ips:.2f}" if performance.on_chip_ips else "--"
+        )
+
         row_data.append(
             (
                 performance.name,
                 score,
+                f"{performance.end_to_end_latency_ms:.2f}",
+                f"{performance.end_to_end_ips:.2f}",
+                on_chip_latency_ms,
+                on_chip_ips,
             )
         )
 
@@ -73,15 +124,22 @@ def compute_performance(
     )
 
     groq_performance_result = timed_inference_end_to_end_latency(
-        dataset, groq_model, chip_type="groq", task=task
+        dataset,
+        groq_model,
+        chip_type="groq",
+        task=task,
     )
 
     host_performance_result = timed_inference_end_to_end_latency(
-        dataset, pytorch_model, chip_type="cpu"
+        dataset,
+        pytorch_model,
+        chip_type="cpu",
     )
 
     result_table = generate_result_comparison_table(
-        [host_performance_result, groq_performance_result], dataset, task
+        [host_performance_result, groq_performance_result],
+        dataset,
+        task,
     )
     return result_table
 
@@ -97,6 +155,7 @@ def groq_model_inference(dataset, model, task: Optional[str] = None):
             pred = [p[0] for p in pred]
         else:
             pred = list(map(torch.vstack, pred))
+
     return dataset.postprocess(pred)
 
 
@@ -104,21 +163,24 @@ def onnx_model_inference(dataset, model):
     print("Running inference on CPU (ONNX).")
     session = onnxruntime.InferenceSession(model)
     result = []
+
     for inputs in tqdm(dataset.x):
         out = session.run(None, inputs)
         if len(out) == 1:
             result.append(torch.tensor(out[0]))
         else:
             result.append(tuple([torch.tensor(out[i]) for i in range(len(out))]))
+
     return dataset.postprocess(result)
 
 
 def pytorch_model_inference(dataset, model):
-    pred = []
     with torch.no_grad():
         print("Running inference using PyTorch model (CPU).")
+        pred = []
         for inputs in tqdm(dataset.x):
             out = model(**inputs)
+
             if not isinstance(out, torch.Tensor):
                 if "logits" in out:
                     out = out.logits
@@ -131,23 +193,47 @@ def pytorch_model_inference(dataset, model):
                         "Unknown output key. List of keys:", list(out.keys())
                     )
             pred.append(out)
+
     return dataset.postprocess(pred)
 
 
 def timed_inference_end_to_end_latency(
-    dataset, model, chip_type: str, task: Optional[str] = None
+    dataset,
+    model,
+    chip_type: str,
+    task: Optional[str] = None,
 ) -> PerformanceResult:
+    result = []
     if chip_type == "groq":
-        result = groq_model_inference(dataset, model, task)
+        t = timeit.Timer(
+            lambda: result.append(groq_model_inference(dataset, model, task))
+        )
+
+        on_chip_latency_ms = model.estimate_performance().compute_latency * 1000
+        production_system_end_to_end_s = model.benchmark().latency
+
     elif chip_type == "cpu":
         if isinstance(model, str):  # ONNX
-            result = onnx_model_inference(dataset, model)
+            t = timeit.Timer(
+                lambda: result.append(onnx_model_inference(dataset, model))
+            )
         else:
-            result = pytorch_model_inference(dataset, model)
+            t = timeit.Timer(
+                lambda: result.append(pytorch_model_inference(dataset, model))
+            )
+        on_chip_latency_ms = None
+
+    latency_s = t.timeit(number=1) / len(dataset.x)
+
+    # for groq chip, use the expected production system latency.
+    if chip_type == "groq":
+        latency_s = production_system_end_to_end_s
 
     return PerformanceResult(
         name=chip_type,
         batch_size=1,
         total_number_of_samples=len(dataset.x),
-        predictions=result,
+        predictions=result[0],
+        on_chip_latency_ms=on_chip_latency_ms,
+        end_to_end_latency_ms=latency_s * 1000,
     )

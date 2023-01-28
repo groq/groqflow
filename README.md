@@ -20,7 +20,7 @@ For installation instructions, please have a look at our [Install Guide](docs/in
 
 To Groq a PyTorch model, simply provide your model and inputs to the `groqit()` function. Once `groqit()` has built your model, you can execute your Groq model the same way you execute a PyTorch model.
 
-<img src="docs/img/groqflow.gif"  width="800"/>
+<img src="https://github.com/groq/groqflow/raw/main/docs/img/groqflow.gif"  width="800"/>
 
 
 `groqit()` also works with ONNX files and provides many customization options. You can find more information about how to use groqit() in our [User Guide](docs/user_guide.md).

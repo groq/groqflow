@@ -60,6 +60,8 @@ python /path/to/example/example_name.py
 | **Example Name** | **Demonstrates** |
 |:--------|:-----------|
 | `pytorch/assembler_flags.py` | the `assembler_flags` argument to `groqit()` |
+| `pytorch/benchmark.py` | the `benchmark()` method of `GroqModel` |
+| `pytorch/benchmark_abunch.py` | the `benchmark_abunch()` method of `GroqModel` |
 | `pytorch/build_name.py` | the `build_name` argument to `groqit()` |
 | `pytorch/cache_dir.py` | the `cache_dir` argument to `groqit()` |
 | `pytorch/compiler_flags.py` | the `compiler_flags` argument to `groqit()` |
