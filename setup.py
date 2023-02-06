@@ -25,7 +25,7 @@ setup(
         "torch==1.13.0",
         "protobuf==3.20.1",
         "pyyaml==6.0",
-        "tensorflow-cpu>=2.9.1",
+        "tensorflow-cpu==2.8.1",
         "tf2onnx>=1.12.0",
         "typeguard>=2.3.13",
         "packaging==21.3",
