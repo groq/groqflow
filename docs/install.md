@@ -4,7 +4,7 @@ The following describes how to install GroqFlow. These instructions enable users
 
 ## Prerequisites
 
-- Ensure that you are using one of the following Linux distributions: Ubuntu 18.04, Ubuntu 22.04, or Rocky 8.4.
+- Ensure that you are using one of the following Linux distributions: Ubuntu 22.04 or Rocky 8.4.
 - Download and install the GroqWare™ Suite version 0.9.2.
   - For more information, see the GroqWare Quick Start Guide at [support.groq.com](https://support.groq.com).
   - To compile your model for Groq hardware, GroqFlow requires the Groq Developer Tools Package (groq-devtools). To run your compiled model on hardware, GroqFlow requires the Groq Runtime Package (groq-runtime).
@@ -21,7 +21,7 @@ The following example demonstrates downloading, installing and creating a Minico
 ```
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh
-conda create -n groqflow python=3.8.13
+conda create -n groqflow python=3.10
 conda activate groqflow
 ```
 

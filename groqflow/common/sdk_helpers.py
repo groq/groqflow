@@ -17,8 +17,8 @@ import groqflow.common.printing as printing
 # Older than min release version fails
 # Not equal to current release version is unsupported and warns
 # but may still work
-MIN_RELEASE_VERSION = "0.9.2"
-CURRENT_RELEASE_VERSION = "0.9.2"
+MIN_RELEASE_VERSION = "0.9.2.1"
+CURRENT_RELEASE_VERSION = "0.9.2.1"
 VALID_VERSIONS = [CURRENT_RELEASE_VERSION, "test"]
 
 
@@ -119,7 +119,7 @@ def is_release_candidate(sdkv: str) -> bool:
     This function returns true if the SDK number provided corresponds to a release candidate
     SDK release candidates use the format major.minor.patch~release_candidate_number
     """
-    return re.match(r"^[0-9]+\.[0-9]+\.[0-9]+~[0-9]+$", sdkv) is not None
+    return len(sdkv.split("~")) == 2
 
 
 def version_is_valid(
