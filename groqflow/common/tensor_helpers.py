@@ -8,14 +8,7 @@ import torch
 import numpy as np
 import groqflow.common.exceptions as exp
 import groqflow.common.build as build
-
-try:
-    import tensorflow as tf
-except ModuleNotFoundError as module_error:
-    raise exp.GroqitEnvError(
-        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
-        "You must install tensorflow to continue."
-    )
+import groqflow.common.tf_helpers as tf_helpers
 
 # Checks whether a given input has the expected shape
 def check_shapes_and_dtypes(inputs, expected_shapes, expected_dtypes):
@@ -47,7 +40,7 @@ def save_inputs(inputs, inputs_file, input_dtypes=None, downcast=True):
                 continue
             if torch.is_tensor(inputs_converted[i][k]):
                 inputs_converted[i][k] = inputs_converted[i][k].cpu().detach().numpy()
-            if tf.is_tensor(inputs_converted[i][k]):
+            if tf_helpers.is_keras_tensor(inputs_converted[i][k]):
                 inputs_converted[i][k] = inputs_converted[i][k].numpy()
             if downcast:
                 if input_dtypes is not None and input_dtypes[k] is not None:

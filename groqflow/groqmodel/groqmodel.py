@@ -21,14 +21,7 @@ import groqflow.common.printing as printing
 import groqflow.common.build as build
 import groqflow.common.sdk_helpers as sdk
 import groqflow.common.tensor_helpers as tensor_helpers
-
-try:
-    import tensorflow as tf
-except ModuleNotFoundError as module_error:
-    raise exp.GroqModelEnvError(
-        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
-        "You must install tensorflow to continue."
-    )
+import groqflow.common.tf_helpers as tf_helpers
 
 
 @dataclass
@@ -380,8 +373,12 @@ class GroqModel:
     # Models with multiple outputs are returned as either a tuple of
     # torch.tensors, tf.Tensors, or np.arrays
     def _unpack_results(self, results: List[Dict], output_nodes, num_outputs):
-        if self.tensor_type is tf.Tensor:
-            unpacked_results = [tf.convert_to_tensor(results[x]) for x in output_nodes]
+        if tf_helpers.type_is_tf_tensor(self.tensor_type):
+            import tensorflow
+
+            unpacked_results = [
+                tensorflow.convert_to_tensor(results[x]) for x in output_nodes
+            ]
         else:
             unpacked_results = [self.tensor_type(results[x]) for x in output_nodes]
         return unpacked_results[0] if num_outputs == 1 else tuple(unpacked_results)
@@ -531,7 +528,9 @@ class PytorchModelWrapper(GroqModel):
 
 class KerasModelWrapper(GroqModel):
     def __init__(self, state):
-        tensor_type = tf.Tensor
+        import tensorflow
+
+        tensor_type = tensorflow.Tensor
         super(KerasModelWrapper, self).__init__(state, tensor_type)
 
     # Keras models are callable

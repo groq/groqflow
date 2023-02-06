@@ -18,15 +18,6 @@ import groqflow.common.onnx_helpers as onnx_helpers
 import groqflow.common.sdk_helpers as sdk
 import groqflow.common.quantization_helpers as quant_helpers
 
-try:
-    import tensorflow as tf
-    import tf2onnx
-except ModuleNotFoundError as module_error:
-    raise exp.GroqitEnvError(
-        "GroqFlow added a dependence on tensorflow and tf2onnx in version 2.1.2. "
-        "You must install tensorflow and tf2onnx to continue."
-    )
-
 
 def _check_model(onnx_file, success_message, fail_message) -> bool:
     if os.path.isfile(onnx_file):
@@ -44,9 +35,11 @@ def _check_model(onnx_file, success_message, fail_message) -> bool:
         return False
 
 
-def get_output_names(onnx_model: Union[str, onnx.ModelProto]):
+def get_output_names(
+    onnx_model: Union[str, onnx.ModelProto]
+):  # pylint: disable=no-member
     # Get output names of ONNX file/model
-    if not isinstance(onnx_model, onnx.ModelProto):
+    if not isinstance(onnx_model, onnx.ModelProto):  # pylint: disable=no-member
         onnx_model = onnx.load(onnx_model)
     return [node.name for node in onnx_model.graph.output]  # pylint: disable=no-member
 
@@ -310,6 +303,9 @@ class ExportKerasModel(stage.GroqitStage):
         )
 
     def fire(self, state: build.State):
+        import tensorflow as tf
+        import tf2onnx
+
         if not isinstance(state.model, (tf.keras.Model)):
             msg = f"""
             The current stage (ExportKerasModel) is only compatible with

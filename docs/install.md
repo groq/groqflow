@@ -5,7 +5,7 @@ The following describes how to install GroqFlow. These instructions enable users
 ## Prerequisites
 
 - Ensure that you are using one of the following Linux distributions: Ubuntu 22.04 or Rocky 8.4.
-- Download and install the GroqWare™ Suite version 0.9.2.
+- Download and install the GroqWare™ Suite version 0.9.2.1.
   - For more information, see the GroqWare Quick Start Guide at [support.groq.com](https://support.groq.com).
   - To compile your model for Groq hardware, GroqFlow requires the Groq Developer Tools Package (groq-devtools). To run your compiled model on hardware, GroqFlow requires the Groq Runtime Package (groq-runtime).
 - Clone the GroqFlow GitHub repo using the following command:

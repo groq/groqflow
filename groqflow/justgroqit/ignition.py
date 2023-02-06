@@ -11,19 +11,12 @@ import groqflow.common.build as build
 import groqflow.common.cache as cache
 import groqflow.common.exceptions as exp
 import groqflow.common.printing as printing
+import groqflow.common.tf_helpers as tf_helpers
 import groqflow.justgroqit.compile as compile
 import groqflow.justgroqit.export as export
 import groqflow.justgroqit.stage as stage
 import groqflow.justgroqit.hummingbird as hummingbird
 from groqflow import __version__ as groqflow_version
-
-try:
-    import tensorflow as tf
-except ModuleNotFoundError as module_error:
-    raise exp.GroqitEnvError(
-        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
-        "You must install tensorflow to continue."
-    )
 
 default_pytorch_export_sequence = stage.Sequence(
     "default_pytorch_export_sequence",
@@ -621,8 +614,8 @@ def _load_model_from_file(path_to_model, user_inputs):
                 raise exp.GroqitIntakeError(msg)
 
         elif isinstance(
-            model, (torch.nn.Module, torch.jit.ScriptModule, tf.keras.Model)
-        ):
+            model, (torch.nn.Module, torch.jit.ScriptModule)
+        ) or tf_helpers.is_keras_model(model):
             return model, inputs, corpus
 
         else:
@@ -697,9 +690,9 @@ def identify_model_type(model) -> build.ModelType:
     elif isinstance(model, str):
         if model.endswith(".onnx"):
             model_type = build.ModelType.ONNX_FILE
-    elif isinstance(model, tf.keras.Model):
+    elif tf_helpers.is_keras_model(model):
         model_type = build.ModelType.KERAS
-        if not tf.executing_eagerly():
+        if not tf_helpers.is_executing_eagerly():
             raise exp.GroqitIntakeError(
                 "`groqit()` requires Keras models to be run in eager execution mode. "
                 "Enable eager execution to continue."

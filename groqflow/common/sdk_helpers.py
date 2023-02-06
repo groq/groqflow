@@ -3,7 +3,6 @@ Helper functions for interfacing with the GroqWare SDK
 """
 
 import os
-import re
 import enum
 import subprocess
 import shutil
@@ -218,17 +217,18 @@ def validate_runtime(
     return version_is_valid(version, required, "groq-runtime", exception_type, hint)
 
 
-# Return the result of bake groot
-def _bake_groot():
+# Returns the root directory of the current git repo and any associated
+# error from running the git command
+def get_repo_root():
     p = subprocess.Popen(
-        ["bake", "groot"],
+        ["git", "rev-parse", "--show-toplevel"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    repo, err = p.communicate()
-    repo = repo.decode("utf-8")
+    out, err = p.communicate()
+    repo = out.decode("utf-8")
+    repo = repo.rstrip("\n")
     err = err.decode("utf-8")
-
     return repo, err
 
 
@@ -241,22 +241,25 @@ def validate_bake():
             )
         )
 
-    repo, err = _bake_groot()
-
-    if err and repo:
-        raise exp.GroqitEnvError(
-            (
-                "You must be inside the Groq repo when the env var "
-                f'{build.environment_variables["dont_use_sdk"]} is set to True. '
-                f"groqit() detected you are inside repo {repo}"
-            )
-        )
+    # bake commands require Groq to be current git repo
+    repo, err = get_repo_root()
+    groq_root = repo.split("/")[-1] == "Groq"
 
     if err:
         raise exp.GroqitEnvError(
             (
                 "You must be inside the Groq repo when the env var "
-                f'{build.environment_variables["dont_use_sdk"]} is set to True'
+                f'{build.environment_variables["dont_use_sdk"]} is set to True. '
+                f"groqit() returned with error {err}"
+            )
+        )
+
+    elif not groq_root:
+        raise exp.GroqitEnvError(
+            (
+                "You must be inside the Groq repo when the env var "
+                f'{build.environment_variables["dont_use_sdk"]} is set to True. '
+                f"groqit() detected you are inside repo {repo}"
             )
         )
 
