@@ -32,7 +32,7 @@ Install the `groqflow` package into your virtual environment:
 ```
 pip install --upgrade pip
 cd groqflow
-pip install -e .
+pip install .
 ```
 
 where `groqflow` is the directory where you cloned the GroqFlow repo in the [prerequisites](#prerequisites).
