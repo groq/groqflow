@@ -10,7 +10,6 @@ from typing import Type, Union
 from pkg_resources import parse_version
 import groqflow.common.build as build
 import groqflow.common.exceptions as exp
-import groqflow.common.printing as printing
 
 
 MIN_RELEASE_VERSION = "0.9.2"
@@ -108,8 +107,7 @@ def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]
         )
 
 
-
-def version_a_less_than_b(version_a, verison_b: str):
+def version_a_less_than_b(version_a, version_b: str):
     """
     Return true if version_a >= version_b, following the scheme:
         major.minor.patch.patchpatch~release_candidate_number
