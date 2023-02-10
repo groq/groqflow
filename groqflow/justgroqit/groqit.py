@@ -74,6 +74,7 @@ def groqit(
         groqview=groqview,
         groqcard=build.GROQCARD,
         num_chips=num_chips,
+        sequence=sequence,
     )
 
     # Analyze the user's model argument and lock in the model, inputs,

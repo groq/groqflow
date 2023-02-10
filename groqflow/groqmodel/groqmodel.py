@@ -9,13 +9,6 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-# TODO: Remove try block once GroqFlow "remote" and "cloud" become part of the release
-try:
-    import groqflow.groqmodel.cloud as cloud
-    import groqflow.groqmodel.remote as remote
-except ModuleNotFoundError:
-    # Proper exceptions are raised if we attempt to use this module on a release branch
-    pass
 import groqflow.common.exceptions as exp
 import groqflow.common.printing as printing
 import groqflow.common.build as build
@@ -282,27 +275,39 @@ class GroqModel:
                 backend = build.Backend.LOCAL
 
         # Check if we are trying to use GroqFlow Remote/Cloud on a public release
-        if (
-            backend == build.Backend.CLOUD
-            and "groqflow.groqmodel.cloud" not in sys.modules
-        ) or (
-            backend == build.Backend.REMOTE
-            and "groqflow.groqmodel.remote" not in sys.modules
-        ):
-            raise exp.GroqModelEnvError(
-                (
-                    f"GroqFlow {backend.value} is not publicly available yet. "
-                    "Please set the environment variable GROQMODEL_BACKEND to 'local'."
+        if backend == build.Backend.CLOUD:
+            try:
+                import mlagility.api.cloud as cloud  # pylint: disable=import-error
+
+                sys.modules["cloud"] = cloud
+            except ModuleNotFoundError:
+                raise exp.GroqModelEnvError(
+                    (
+                        'To use GroqFlow "cloud" backend please install mlagility. '
+                        "You can find more information at github.com/groq/mlagility."
+                    )
                 )
-            )
+        elif backend == build.Backend.REMOTE:
+
+            try:
+                import groqflow.groqmodel.remote as remote
+
+                sys.modules["remote"] = remote
+            except ModuleNotFoundError:
+                raise exp.GroqModelEnvError(
+                    (
+                        f"GroqFlow {backend.value} is not publicly available yet. "
+                        "Please set the environment variable GROQMODEL_BACKEND to 'local'."
+                    )
+                )
 
         if backend == build.Backend.REMOTE and self.remote_client is None:
             # Setup remote client if needed
             remote_url = os.environ.get("GROQFLOW_REMOTE_URL")
             self.remote_client = (
-                remote.RemoteClient()
+                sys.modules["remote"].RemoteClient()
                 if remote_url is None
-                else remote.RemoteClient(remote_url)
+                else sys.modules["remote"].RemoteClient(remote_url)
             )
 
         return backend
@@ -351,7 +356,7 @@ class GroqModel:
         # Select execution script according to backend
         backend = self._select_backend()
         if backend == build.Backend.CLOUD:
-            cloud.execute_groqchip_remotely(
+            sys.modules["cloud"].execute_groqchip_remotely(
                 bringup_topology, repetitions, self.state, self.log_execute_path
             )
         elif backend == build.Backend.REMOTE:
