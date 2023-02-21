@@ -39,6 +39,12 @@ pip install .
 
 where `groqflow` is the directory where you cloned the GroqFlow repo in the [prerequisites](#prerequisites).
 
+_Optional_: if you want to use GroqFlow with TensorFlow, use this install command instead of `pip install .`:
+
+```
+pip install .[tensorflow]
+```
+
 ### Step 3: Add GroqWare Suite to Python Path
 
 This adds the Groq tools to your path:

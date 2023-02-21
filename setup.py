@@ -25,11 +25,12 @@ setup(
         "torch>=1.12.1",
         "protobuf>=3.17.3",
         "pyyaml>=5.4",
-        "tensorflow-cpu>=2.8.1",
-        "tf2onnx>=1.12.0",
         "typeguard>=2.3.13",
         "packaging>=21.3",
     ],
+    extras_require={
+        "tensorflow": ["tensorflow-cpu>=2.8.1", "tf2onnx>=1.12.0"],
+    },
     classifiers=[],
     entry_points={
         "console_scripts": [
