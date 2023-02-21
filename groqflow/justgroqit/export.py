@@ -34,6 +34,10 @@ def _check_model(onnx_file, success_message, fail_message) -> bool:
         print(e)
         return False
 
+def _warn_to_stdout(message, category, filename, line_number, _, __):
+    sys.stdout.write(
+        warnings.formatwarning(message, category, filename, line_number)
+    )
 
 def get_output_names(
     onnx_model: Union[str, onnx.ModelProto]
@@ -229,13 +233,8 @@ class ExportPytorchModel(stage.GroqitStage):
 
         # Send torch export warnings to stdout (and therefore the log file)
         # so that they don't fill up the command line
-        def warn_to_stdout(message, category, filename, line_number, _, __):
-            sys.stdout.write(
-                warnings.formatwarning(message, category, filename, line_number)
-            )
-
         default_warnings = warnings.showwarning
-        warnings.showwarning = warn_to_stdout
+        warnings.showwarning = _warn_to_stdout
 
         # Export the model to ONNX
         torch.onnx.export(
@@ -547,6 +546,11 @@ class ConvertOnnxToFp16(stage.GroqitStage):
         # our version of onnxmltools sees
         # https://github.com/microsoft/onnxconverter-common/blob/master/onnxconverter_common/float16.py#L82
 
+        # Send onnxmltools warnings to stdout (and therefore the log file)
+        # so that they don't fill up the command line
+        default_warnings = warnings.showwarning
+        warnings.showwarning = _warn_to_stdout
+
         # Legalize ops are ops that have been or are currently in the block list
         # that we explicitly want removed
         legalize_ops = ["InstanceNormalization", "Resize", "Max"]
@@ -571,6 +575,9 @@ class ConvertOnnxToFp16(stage.GroqitStage):
             onnxmltools.utils.save_model(fp16_model, output_path)
         except ValueError:
             onnx.save_model(fp16_model, output_path, save_as_external_data=True)
+
+        # Restore default warnings behavior
+        warnings.showwarning = default_warnings
 
         # Check that the converted model is still valid
         success_msg = "\tSuccess converting ONNX model to fp16"
