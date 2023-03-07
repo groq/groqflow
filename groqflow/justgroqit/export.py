@@ -34,10 +34,12 @@ def _check_model(onnx_file, success_message, fail_message) -> bool:
         print(e)
         return False
 
-def _warn_to_stdout(message, category, filename, line_number, _, __):
+
+def _warn_to_stdout(message, category, filename, line_number, _, line):
     sys.stdout.write(
-        warnings.formatwarning(message, category, filename, line_number)
+        warnings.formatwarning(message, category, filename, line_number, line)
     )
+
 
 def get_output_names(
     onnx_model: Union[str, onnx.ModelProto]

@@ -21,11 +21,11 @@ The following example demonstrates downloading, installing and creating a Minico
 ```
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh
-conda create -n groqflow python=PYTHON_VERSION
+conda create -n groqflow python=$GF_PYTHON_VERSION
 conda activate groqflow
 ```
 
-Where `PYTHON_VERSION` is your desired version of Python.
+Where `$GF_PYTHON_VERSION` is your desired version of Python.
 
 ### Step 2: Pip install GroqFlow
 

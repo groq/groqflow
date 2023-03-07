@@ -8,6 +8,8 @@ The Bert-tiny proof point uses a model fine-tuned on the [Stanford Sentiment Tre
 
 The BERT-base proof point also uses a pre-trained model that is fine-tuned on the SST dataset for Sentiment Classification. [Huggingface](https://huggingface.co/howey/bert-base-uncased-sst2) provides the BERT-base model.
 
+The Bert-quantize proof point performs post training quantization on the BERT-base model specified above. 1000 data samples from the SST Sentiment Classification dataset are chosen at random to determine the quantization parameters.
+
 ## Prerequisites
 
 - Ensure you've completed the install prerequisites:
@@ -35,12 +37,6 @@ To build and evaluate BERT-base:
   python bert_base.py
   ```
 
-  To build and evaluate BERT-quantized:
-
-  ```bash
-  python bert_quantize.py
-  ```
-
 Note: The Proof Points directory [readme.md](../../README.md) details how to build and execute on two machines.
 
 ## Expected Results
@@ -51,4 +47,4 @@ Note: The Proof Points directory [readme.md](../../README.md) details how to bui
 |:-----------|:--------|:---------|:----------|
 | BERT-tiny | 1 min | 30 sec | 1 |
 | BERT-base | 15 min | 4 min | 4 |
-| BERT-quantize | 15 min | 4 min | 4 |
+| BERT-quantize | 17 min | 4 min | 4 |

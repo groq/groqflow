@@ -108,11 +108,14 @@ class BasicDataset(Dataset):
 
 
 class LanguageDataset(Dataset):
-    def __init__(self, name: str, tokenizer, max_seq_length) -> None:
+    def __init__(
+        self, name: str, tokenizer, max_seq_length, input_id_dtype=None
+    ) -> None:
         super().__init__(name)
         self.raw_data = load_dataset(self.name, split="test")
         self.tokenizer = tokenizer
         self.max_seq_length = max_seq_length
+        self.input_id_dtype = input_id_dtype
         self.x, self.y = self.preprocess()
 
     def preprocess(self):
@@ -120,6 +123,8 @@ class LanguageDataset(Dataset):
         x, y = (self.raw_data[feature_names[0]], self.raw_data[feature_names[1]])
         x = list(map(lambda x: self.tokenizer.encode(x, add_special_tokens=True), x))
         x, y = binarize_labels(zero_pad((x, y), length=self.max_seq_length))
+        if self.input_id_dtype:
+            x = x.astype(self.input_id_dtype)
         x = [
             {
                 "input_ids": torch.unsqueeze(torch.from_numpy(x_), dim=0),
@@ -971,7 +976,7 @@ def get_sst_quantization_samples(quantize_samples_count=1000):
     limit = lambda data: data[:quantize_samples_count]
     x_train = limit(x_train)
 
-    return [(np.array([x], dtype=np.int64), (np.array([x]) != 0)) for x in x_train]
+    return [(np.array([x], dtype=np.int32), (np.array([x]) != 0)) for x in x_train]
 
 
 def create_dataset(
@@ -983,6 +988,10 @@ def create_dataset(
 ) -> Dataset:
     if name == "sst":
         return LanguageDataset(name, tokenizer, max_seq_length)
+    elif name == "sst-int32":
+        return LanguageDataset(
+            "sst", tokenizer, max_seq_length, input_id_dtype=np.int32
+        )
     elif name == "squad":
         return QuestionAnsweringDataset(name, tokenizer, max_seq_length)
     elif name == "sampled_imagenet":
