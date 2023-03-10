@@ -12,7 +12,7 @@ import groqflow.common.build as build
 import groqflow.common.exceptions as exp
 
 
-MIN_RELEASE_VERSION = "0.9.2"
+MIN_RELEASE_VERSION = "0.9.2.1"
 
 
 class OS(enum.Enum):
