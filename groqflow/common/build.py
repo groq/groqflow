@@ -520,11 +520,10 @@ class State:
         # However, we do not save quantization samples
         # Instead, we save a boolean to indicate whether the model
         # stored has been quantized by some samples.
-        for key, value in vars(self).items():
-            if key == "quantization_samples" and value is not None:
-                state_dict["quantization_samples"] = True
-            else:
-                state_dict["quantization_samples"] = False
+        if self.quantization_samples:
+            state_dict["quantization_samples"] = True
+        else:
+            state_dict["quantization_samples"] = False
 
         with open(
             state_file(self.cache_dir, self.config.build_name), "w", encoding="utf8"
