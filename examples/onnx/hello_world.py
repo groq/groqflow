@@ -42,7 +42,7 @@ torch.onnx.export(
     pytorch_model,
     input_tensor,
     onnx_model,
-    opset_version=13,
+    opset_version=14,
     input_names=["input"],
     output_names=["output"],
 )
