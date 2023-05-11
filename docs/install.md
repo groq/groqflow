@@ -4,8 +4,8 @@ The following describes how to install GroqFlow. These instructions enable users
 
 ## Prerequisites
 
-- Ensure that you are using one of the following Linux distributions: Ubuntu 18.04, Ubuntu 22.04, or Rocky 8.4.
-- Download and install the GroqWare™ Suite version 0.9.2.
+- Ensure that you are using one of the following Linux distributions: Ubuntu 18.04, Ubuntu 22.04 or Rocky 8.4.
+- Download and install the GroqWare™ Suite version >=0.9.2.1.
   - For more information, see the GroqWare Quick Start Guide at [support.groq.com](https://support.groq.com).
   - To compile your model for Groq hardware, GroqFlow requires the Groq Developer Tools Package (groq-devtools). To run your compiled model on hardware, GroqFlow requires the Groq Runtime Package (groq-runtime).
 - Clone the GroqFlow GitHub repo using the following command:
@@ -21,9 +21,11 @@ The following example demonstrates downloading, installing and creating a Minico
 ```
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh
-conda create -n groqflow python=3.8.13
+conda create -n groqflow python=$GF_PYTHON_VERSION
 conda activate groqflow
 ```
+
+Where `$GF_PYTHON_VERSION` is your desired version of Python.
 
 ### Step 2: Pip install GroqFlow
 
@@ -32,10 +34,16 @@ Install the `groqflow` package into your virtual environment:
 ```
 pip install --upgrade pip
 cd groqflow
-pip install -e .
+pip install .
 ```
 
 where `groqflow` is the directory where you cloned the GroqFlow repo in the [prerequisites](#prerequisites).
+
+_Optional_: if you want to use GroqFlow with TensorFlow, use this install command instead of `pip install .`:
+
+```
+pip install .[tensorflow]
+```
 
 ### Step 3: Add GroqWare Suite to Python Path
 

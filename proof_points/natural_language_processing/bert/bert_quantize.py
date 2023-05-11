@@ -46,7 +46,7 @@ def evaluate_bert(rebuild_policy=None, should_execute=True):
     batch_size = 1
     max_seq_length = 128
     dummy_inputs = {
-        "input_ids": torch.ones(batch_size, max_seq_length, dtype=torch.long),
+        "input_ids": torch.ones(batch_size, max_seq_length, dtype=torch.int32),
         "attention_mask": torch.ones(batch_size, max_seq_length, dtype=torch.bool),
     }
 
@@ -59,6 +59,7 @@ def evaluate_bert(rebuild_policy=None, should_execute=True):
         dummy_inputs,
         rebuild=rebuild_policy,
         quantization_samples=x_train,
+        compiler_flags=["--large-program"],
     )
 
     if should_execute:
@@ -66,7 +67,7 @@ def evaluate_bert(rebuild_policy=None, should_execute=True):
         return compute_performance(
             groq_model,
             pytorch_model,
-            dataset="sst",
+            dataset="sst-int32",
             tokenizer=tokenizer,
             max_seq_length=max_seq_length,
             task="classification",

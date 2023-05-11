@@ -9,26 +9,12 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-# TODO: Remove try block once GroqFlow "remote" and "cloud" become part of the release
-try:
-    import groqflow.groqmodel.cloud as cloud
-    import groqflow.groqmodel.remote as remote
-except ModuleNotFoundError:
-    # Proper exceptions are raised if we attempt to use this module on a release branch
-    pass
 import groqflow.common.exceptions as exp
 import groqflow.common.printing as printing
 import groqflow.common.build as build
 import groqflow.common.sdk_helpers as sdk
 import groqflow.common.tensor_helpers as tensor_helpers
-
-try:
-    import tensorflow as tf
-except ModuleNotFoundError as module_error:
-    raise exp.GroqModelEnvError(
-        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
-        "You must install tensorflow to continue."
-    )
+import groqflow.common.tf_helpers as tf_helpers
 
 
 @dataclass
@@ -289,27 +275,39 @@ class GroqModel:
                 backend = build.Backend.LOCAL
 
         # Check if we are trying to use GroqFlow Remote/Cloud on a public release
-        if (
-            backend == build.Backend.CLOUD
-            and "groqflow.groqmodel.cloud" not in sys.modules
-        ) or (
-            backend == build.Backend.REMOTE
-            and "groqflow.groqmodel.remote" not in sys.modules
-        ):
-            raise exp.GroqModelEnvError(
-                (
-                    f"GroqFlow {backend.value} is not publicly available yet. "
-                    "Please set the environment variable GROQMODEL_BACKEND to 'local'."
+        if backend == build.Backend.CLOUD:
+            try:
+                import mlagility.api.cloud as cloud  # pylint: disable=import-error
+
+                sys.modules["cloud"] = cloud
+            except ModuleNotFoundError:
+                raise exp.GroqModelEnvError(
+                    (
+                        'To use GroqFlow "cloud" backend please install mlagility. '
+                        "You can find more information at github.com/groq/mlagility."
+                    )
                 )
-            )
+        elif backend == build.Backend.REMOTE:
+
+            try:
+                import groqflow.groqmodel.remote as remote
+
+                sys.modules["remote"] = remote
+            except ModuleNotFoundError:
+                raise exp.GroqModelEnvError(
+                    (
+                        f"GroqFlow {backend.value} is not publicly available yet. "
+                        "Please set the environment variable GROQMODEL_BACKEND to 'local'."
+                    )
+                )
 
         if backend == build.Backend.REMOTE and self.remote_client is None:
             # Setup remote client if needed
             remote_url = os.environ.get("GROQFLOW_REMOTE_URL")
             self.remote_client = (
-                remote.RemoteClient()
+                sys.modules["remote"].RemoteClient()
                 if remote_url is None
-                else remote.RemoteClient(remote_url)
+                else sys.modules["remote"].RemoteClient(remote_url)
             )
 
         return backend
@@ -358,7 +356,7 @@ class GroqModel:
         # Select execution script according to backend
         backend = self._select_backend()
         if backend == build.Backend.CLOUD:
-            cloud.execute_groqchip_remotely(
+            sys.modules["cloud"].execute_groqchip_remotely(
                 bringup_topology, repetitions, self.state, self.log_execute_path
             )
         elif backend == build.Backend.REMOTE:
@@ -380,8 +378,12 @@ class GroqModel:
     # Models with multiple outputs are returned as either a tuple of
     # torch.tensors, tf.Tensors, or np.arrays
     def _unpack_results(self, results: List[Dict], output_nodes, num_outputs):
-        if self.tensor_type is tf.Tensor:
-            unpacked_results = [tf.convert_to_tensor(results[x]) for x in output_nodes]
+        if tf_helpers.type_is_tf_tensor(self.tensor_type):
+            import tensorflow
+
+            unpacked_results = [
+                tensorflow.convert_to_tensor(results[x]) for x in output_nodes
+            ]
         else:
             unpacked_results = [self.tensor_type(results[x]) for x in output_nodes]
         return unpacked_results[0] if num_outputs == 1 else tuple(unpacked_results)
@@ -531,7 +533,9 @@ class PytorchModelWrapper(GroqModel):
 
 class KerasModelWrapper(GroqModel):
     def __init__(self, state):
-        tensor_type = tf.Tensor
+        import tensorflow
+
+        tensor_type = tensorflow.Tensor
         super(KerasModelWrapper, self).__init__(state, tensor_type)
 
     # Keras models are callable

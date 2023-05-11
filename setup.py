@@ -15,27 +15,28 @@ setup(
         exclude=["*.__pycache__.*"],
     ),
     install_requires=[
-        "onnx==1.11.0",
+        "onnx>=1.11.0",
         "onnxmltools==1.10.0",
         "hummingbird-ml==0.4.4",
         "scikit-learn==1.1.1",
         "xgboost==1.6.1",
-        "onnxruntime==1.10.0",
+        "onnxruntime>=1.10.0",
         "paramiko==2.11.0",
         "torch>=1.12.1",
-        "protobuf==3.17.3",
-        "pyyaml==5.4",
-        "tensorflow-cpu>=2.9.1",
-        "tf2onnx>=1.12.0",
+        "protobuf>=3.17.3",
+        "pyyaml>=5.4",
         "typeguard>=2.3.13",
-        "packaging",
+        "packaging>=21.3",
     ],
+    extras_require={
+        "tensorflow": ["tensorflow-cpu>=2.8.1", "tf2onnx>=1.12.0"],
+    },
     classifiers=[],
     entry_points={
         "console_scripts": [
         ]
     },
-    python_requires="==3.8.*",
+    python_requires=">=3.8, <3.11",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
 )

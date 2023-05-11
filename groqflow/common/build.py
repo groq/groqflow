@@ -13,14 +13,12 @@ import torch
 import numpy as np
 import sklearn.base
 import groqflow.common.exceptions as exp
+import groqflow.common.tf_helpers as tf_helpers
 
-try:
-    import tensorflow as tf
-except ModuleNotFoundError as module_error:
-    raise exp.GroqitEnvError(
-        "GroqFlow added a dependence on tensorflow in version 2.1.2. "
-        "You must install tensorflow to continue."
-    )
+
+class Groqcard(enum.Enum):
+    A14 = "A1.4"
+    A11 = "A1.1"
 
 
 UnionValidModelInstanceTypes = Union[
@@ -28,14 +26,9 @@ UnionValidModelInstanceTypes = Union[
     str,
     torch.nn.Module,
     torch.jit.ScriptModule,
-    tf.keras.Model,
+    "tf.keras.Model",
     sklearn.base.BaseEstimator,
 ]
-
-
-class Groqcard(enum.Enum):
-    A14 = "A1.4"
-    A11 = "A1.1"
 
 
 # WARNING: The "internal" env var may cause unexpected behavior if enabled
@@ -244,7 +237,7 @@ def get_shapes_and_dtypes(inputs: dict):
                 (list, tuple),
             )
             or torch.is_tensor(value)
-            or tf.is_tensor(value)
+            or tf_helpers.is_keras_tensor(value)
         ):
             shapes[key] = np.array(value).shape
             dtypes[key] = np.array(value).dtype.name
@@ -527,11 +520,10 @@ class State:
         # However, we do not save quantization samples
         # Instead, we save a boolean to indicate whether the model
         # stored has been quantized by some samples.
-        for key, value in vars(self).items():
-            if key == "quantization_samples" and value is not None:
-                state_dict["quantization_samples"] = True
-            else:
-                state_dict["quantization_samples"] = False
+        if self.quantization_samples:
+            state_dict["quantization_samples"] = True
+        else:
+            state_dict["quantization_samples"] = False
 
         with open(
             state_file(self.cache_dir, self.config.build_name), "w", encoding="utf8"

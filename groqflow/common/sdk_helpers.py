@@ -3,7 +3,6 @@ Helper functions for interfacing with the GroqWare SDK
 """
 
 import os
-import re
 import enum
 import subprocess
 import shutil
@@ -11,15 +10,9 @@ from typing import Type, Union
 from pkg_resources import parse_version
 import groqflow.common.build as build
 import groqflow.common.exceptions as exp
-import groqflow.common.printing as printing
 
 
-# Older than min release version fails
-# Not equal to current release version is unsupported and warns
-# but may still work
-MIN_RELEASE_VERSION = "0.9.2"
-CURRENT_RELEASE_VERSION = "0.9.2"
-VALID_VERSIONS = [CURRENT_RELEASE_VERSION, "test"]
+MIN_RELEASE_VERSION = "0.9.2.1"
 
 
 class OS(enum.Enum):
@@ -114,12 +107,19 @@ def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]
         )
 
 
-def is_release_candidate(sdkv: str) -> bool:
+def version_a_less_than_b(version_a, version_b: str):
     """
-    This function returns true if the SDK number provided corresponds to a release candidate
-    SDK release candidates use the format major.minor.patch~release_candidate_number
+    Return true if version_a >= version_b, following the scheme:
+        major.minor.patch.patchpatch~release_candidate_number
+
+    The release_candidate_number should be ignored.
     """
-    return re.match(r"^[0-9]+\.[0-9]+\.[0-9]+~[0-9]+$", sdkv) is not None
+
+    # Strip the release candidate number, if any
+    clean_version_a = version_a.split("~")[0]
+    clean_version_b = version_b.split("~")[0]
+
+    return parse_version(clean_version_a) < parse_version(clean_version_b)
 
 
 def version_is_valid(
@@ -128,47 +128,25 @@ def version_is_valid(
     requirement_name: str,
     exception_type: Type[Exception] = exp.GroqitEnvError,
     hint: str = "",
-) -> bool:
+):
+    """
+    Raise an exception if the required version number is not installed
+    """
+
     msg = (
         f"{requirement_name}>={MIN_RELEASE_VERSION} is a required dependency "
         "for this part of GroqFlow"
     )
 
     # Package not found
-    if not sdkv:
-        if required:
-            msg = msg + f". However, {requirement_name} was not found. "
-            raise exception_type(msg + hint)
-        else:
-            return False
-    # Package found, but version is not acceptable
-    elif sdkv not in VALID_VERSIONS and not is_release_candidate(sdkv):
-        if required:
-            if parse_version(sdkv) < parse_version(MIN_RELEASE_VERSION):
-                msg = msg + f" ({sdkv} is installed). "
-                raise exception_type(msg + hint)
-            else:
-                msg = (
-                    "This version of Groqflow is only officially supported with "
-                    f"{requirement_name}=={CURRENT_RELEASE_VERSION} but the installed "
-                    f"{requirement_name} is version {sdkv}. This may still work but "
-                    f"ensure you are using {CURRENT_RELEASE_VERSION} before "
-                    "opening a support ticket."
-                )
-                printing.log_warning(msg)
-        else:
-            return False
-    # User has a release candidate installed
-    elif is_release_candidate(sdkv):
-        msg = (
-            "This machine has a GroqWare SDK release candidate installed. "
-            "If you encounter unexpected behavior, please try again with the "
-            f"officially supported SDK version, {CURRENT_RELEASE_VERSION}."
-        )
-        printing.log_warning(msg)
+    if not sdkv and required:
+        msg = msg + f". However, {requirement_name} was not found. "
+        raise exception_type(msg + hint)
 
-    # Package found and has a valid version
-    return True
+    # Package found, but version is not acceptable
+    elif version_a_less_than_b(sdkv, MIN_RELEASE_VERSION) and required:
+        msg = msg + f" ({sdkv} is installed). "
+        raise exception_type(msg + hint)
 
 
 def validate_os_version() -> OS:
@@ -205,7 +183,7 @@ def validate_devtools(
 ) -> Union[bool, str]:
     version = _installed_package_version("groq-devtools", os_version)
     hint = "Please contact sales@groq.com to get access to groq-devtools."
-    return version_is_valid(version, required, "groq-devtools", exception_type, hint)
+    version_is_valid(version, required, "groq-devtools", exception_type, hint)
 
 
 def validate_runtime(
@@ -215,20 +193,21 @@ def validate_runtime(
 ) -> Union[bool, str]:
     version = _installed_package_version("groq-runtime", os_version)
     hint = "Please contact sales@groq.com to get access to groq-runtime."
-    return version_is_valid(version, required, "groq-runtime", exception_type, hint)
+    version_is_valid(version, required, "groq-runtime", exception_type, hint)
 
 
-# Return the result of bake groot
-def _bake_groot():
+# Returns the root directory of the current git repo and any associated
+# error from running the git command
+def get_repo_root():
     p = subprocess.Popen(
-        ["bake", "groot"],
+        ["git", "rev-parse", "--show-toplevel"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    repo, err = p.communicate()
-    repo = repo.decode("utf-8")
+    out, err = p.communicate()
+    repo = out.decode("utf-8")
+    repo = repo.rstrip("\n")
     err = err.decode("utf-8")
-
     return repo, err
 
 
@@ -241,9 +220,20 @@ def validate_bake():
             )
         )
 
-    repo, err = _bake_groot()
+    # bake commands require Groq to be current git repo
+    repo, err = get_repo_root()
+    groq_root = repo.split("/")[-1] == "Groq"
 
-    if err and repo:
+    if err:
+        raise exp.GroqitEnvError(
+            (
+                "You must be inside the Groq repo when the env var "
+                f'{build.environment_variables["dont_use_sdk"]} is set to True. '
+                f"groqit() returned with error {err}"
+            )
+        )
+
+    elif not groq_root:
         raise exp.GroqitEnvError(
             (
                 "You must be inside the Groq repo when the env var "
@@ -252,20 +242,12 @@ def validate_bake():
             )
         )
 
-    if err:
-        raise exp.GroqitEnvError(
-            (
-                "You must be inside the Groq repo when the env var "
-                f'{build.environment_variables["dont_use_sdk"]} is set to True'
-            )
-        )
-
 
 def check_dependencies(
     require_devtools: bool = False,
     require_runtime: bool = False,
     exception_type: Type[Exception] = exp.GroqitEnvError,
-) -> bool:
+):
 
     # Skip dependency check if necessary
     if os.environ.get("GROQFLOW_SKIP_SDK_CHECK") == "True":
@@ -288,5 +270,3 @@ def check_dependencies(
             required=require_runtime,
             exception_type=exception_type,
         )
-
-    return True

@@ -8,10 +8,10 @@ setup(
     author_email="sales@groq.com",
     license="groq-license",
     packages=find_packages(
-        include=["groqflow_demo_helpers"],
         exclude=["*.__pycache__.*"],
     ),
     install_requires=[
+        "charset-normalizer==2.1.0",
         "torch>=1.12.0",
         "transformers>=4.20.0",
         "datasets>=2.3.2",

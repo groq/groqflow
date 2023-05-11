@@ -18,15 +18,6 @@ import groqflow.common.onnx_helpers as onnx_helpers
 import groqflow.common.sdk_helpers as sdk
 import groqflow.common.quantization_helpers as quant_helpers
 
-try:
-    import tensorflow as tf
-    import tf2onnx
-except ModuleNotFoundError as module_error:
-    raise exp.GroqitEnvError(
-        "GroqFlow added a dependence on tensorflow and tf2onnx in version 2.1.2. "
-        "You must install tensorflow and tf2onnx to continue."
-    )
-
 
 def _check_model(onnx_file, success_message, fail_message) -> bool:
     if os.path.isfile(onnx_file):
@@ -44,9 +35,17 @@ def _check_model(onnx_file, success_message, fail_message) -> bool:
         return False
 
 
-def get_output_names(onnx_model: Union[str, onnx.ModelProto]):
+def _warn_to_stdout(message, category, filename, line_number, _, line):
+    sys.stdout.write(
+        warnings.formatwarning(message, category, filename, line_number, line)
+    )
+
+
+def get_output_names(
+    onnx_model: Union[str, onnx.ModelProto]
+):  # pylint: disable=no-member
     # Get output names of ONNX file/model
-    if not isinstance(onnx_model, onnx.ModelProto):
+    if not isinstance(onnx_model, onnx.ModelProto):  # pylint: disable=no-member
         onnx_model = onnx.load(onnx_model)
     return [node.name for node in onnx_model.graph.output]  # pylint: disable=no-member
 
@@ -236,13 +235,8 @@ class ExportPytorchModel(stage.GroqitStage):
 
         # Send torch export warnings to stdout (and therefore the log file)
         # so that they don't fill up the command line
-        def warn_to_stdout(message, category, filename, line_number, _, __):
-            sys.stdout.write(
-                warnings.formatwarning(message, category, filename, line_number)
-            )
-
         default_warnings = warnings.showwarning
-        warnings.showwarning = warn_to_stdout
+        warnings.showwarning = _warn_to_stdout
 
         # Export the model to ONNX
         torch.onnx.export(
@@ -310,6 +304,9 @@ class ExportKerasModel(stage.GroqitStage):
         )
 
     def fire(self, state: build.State):
+        import tensorflow as tf
+        import tf2onnx
+
         if not isinstance(state.model, (tf.keras.Model)):
             msg = f"""
             The current stage (ExportKerasModel) is only compatible with
@@ -551,6 +548,11 @@ class ConvertOnnxToFp16(stage.GroqitStage):
         # our version of onnxmltools sees
         # https://github.com/microsoft/onnxconverter-common/blob/master/onnxconverter_common/float16.py#L82
 
+        # Send onnxmltools warnings to stdout (and therefore the log file)
+        # so that they don't fill up the command line
+        default_warnings = warnings.showwarning
+        warnings.showwarning = _warn_to_stdout
+
         # Legalize ops are ops that have been or are currently in the block list
         # that we explicitly want removed
         legalize_ops = ["InstanceNormalization", "Resize", "Max"]
@@ -575,6 +577,9 @@ class ConvertOnnxToFp16(stage.GroqitStage):
             onnxmltools.utils.save_model(fp16_model, output_path)
         except ValueError:
             onnx.save_model(fp16_model, output_path, save_as_external_data=True)
+
+        # Restore default warnings behavior
+        warnings.showwarning = default_warnings
 
         # Check that the converted model is still valid
         success_msg = "\tSuccess converting ONNX model to fp16"
