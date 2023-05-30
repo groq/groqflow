@@ -449,7 +449,7 @@ class GroqModel:
             if shutil.which("/usr/local/groq/bin/python"):
                 python_cmd = "/usr/local/groq/bin/python"
             else:
-                python_cmd = "python"
+                python_cmd = sys.executable
             execution_script = [
                 python_cmd,
                 f"{src_folder}/execute.py",
