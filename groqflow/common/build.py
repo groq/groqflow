@@ -278,6 +278,7 @@ class Config:
     groqcard: Groqcard
     sequence: List[str]
     num_chips: Optional[int] = None
+    onnx_opset: int = DEFAULT_ONNX_OPSET
 
 
 @dataclasses.dataclass
