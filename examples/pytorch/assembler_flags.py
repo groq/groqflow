@@ -46,3 +46,5 @@ gmodel = groqit(
 # to verify your flags were applied.
 print(f"\nUser-provided flags: {user_provided_assembler_flags}")
 print(f"Groq Assembler command: {gmodel.state.info.assembler_command}")
+
+print("Example assembler_flags.py finished")

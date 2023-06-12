@@ -27,15 +27,12 @@ setup(
         "pyyaml>=5.4",
         "typeguard>=2.3.13",
         "packaging>=21.3",
+        "mlagility==3.0.2",
     ],
     extras_require={
         "tensorflow": ["tensorflow-cpu>=2.8.1", "tf2onnx>=1.12.0"],
     },
     classifiers=[],
-    entry_points={
-        "console_scripts": [
-        ]
-    },
     python_requires=">=3.8, <3.11",
     long_description=open("README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",

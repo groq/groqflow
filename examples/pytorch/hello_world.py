@@ -42,3 +42,5 @@ groq_outputs = groq_model(**inputs)
 # Print Pytorch and Groq results
 print(f"Pytorch_outputs: {pytorch_outputs}")
 print(f"Groq_outputs: {groq_outputs}")
+
+print("Example hello_world.py finished")

@@ -43,3 +43,5 @@ gmodel = groqit(pytorch_model, inputs, compiler_flags=user_provided_compiler_fla
 # to verify your flags were applied.
 print(f"\nUser-provided flags: {user_provided_compiler_flags}")
 print(f"Groq Assembler command: {gmodel.state.info.compiler_command}")
+
+print("Example compiler_flags.py finished")

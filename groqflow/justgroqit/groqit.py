@@ -1,14 +1,15 @@
 from typing import Optional, List, Dict, Any
 from collections.abc import Collection
+import onnxflow.common.printing as printing
+import onnxflow.justbuildit.stage as stage
+import onnxflow.common.build as of_build
 import groqflow.justgroqit.ignition as ignition
 import groqflow.groqmodel as groqmodel
-import groqflow.justgroqit.stage as stage
-import groqflow.common.printing as printing
 import groqflow.common.build as build
 
 
 def groqit(
-    model: build.UnionValidModelInstanceTypes = None,
+    model: of_build.UnionValidModelInstanceTypes = None,
     inputs: Optional[Dict[str, Any]] = None,
     build_name: Optional[str] = None,
     cache_dir: str = build.DEFAULT_CACHE_DIR,
@@ -18,7 +19,7 @@ def groqit(
     assembler_flags: Optional[List[str]] = None,
     num_chips: Optional[int] = None,
     groqview: bool = False,
-    sequence: Optional[List[stage.GroqitStage]] = None,
+    sequence: Optional[stage.Sequence] = None,
     quantization_samples: Collection = None,
 ) -> groqmodel.GroqModel:
 
@@ -65,9 +66,10 @@ def groqit(
             argument needs to be manually set to "always" in the current build
             in order to create a new GroqModel.
     """
+
     # Validate and lock in the groqit() config (user arguments that
     # configure the build) that will be used by the rest of groqit()
-    (config, auto_name) = ignition.lock_config(
+    config = ignition.lock_config(
         build_name=build_name,
         compiler_flags=compiler_flags,
         assembler_flags=assembler_flags,
@@ -79,13 +81,7 @@ def groqit(
 
     # Analyze the user's model argument and lock in the model, inputs,
     # and sequence that will be used by the rest of groqit()
-    (
-        model_locked,
-        inputs_locked,
-        sequence_locked,
-        model_type,
-        corpus,
-    ) = ignition.model_intake(
+    (model_locked, inputs_locked, sequence_locked, model_type,) = ignition.model_intake(
         model,
         inputs,
         sequence,
@@ -101,7 +97,6 @@ def groqit(
         model_type=model_type,
         monitor=monitor,
         use_sdk=build.USE_SDK,
-        corpus=corpus,
         model=model_locked,
         inputs=inputs_locked,
         quantization_samples=quantization_samples,
@@ -109,10 +104,10 @@ def groqit(
 
     # Return a cached build if possible, otherwise prepare the model State for
     # a build
-    if state.build_status == build.Status.SUCCESSFUL_BUILD:
+    if state.build_status == of_build.Status.SUCCESSFUL_BUILD:
         # Successful builds can be loaded from cache and returned with
         # no additional steps
-        additional_msg = " (build_name auto-selected)" if auto_name else ""
+        additional_msg = " (build_name auto-selected)" if config.auto_name else ""
         printing.log_success(
             f' Build "{config.build_name}"{additional_msg} found in cache. Loading it!',
         )
@@ -124,9 +119,9 @@ def groqit(
     sequence_locked.show_monitor(config, state.monitor)
     state = sequence_locked.launch(state)
 
-    if state.build_status == build.Status.SUCCESSFUL_BUILD:
+    if state.build_status == of_build.Status.SUCCESSFUL_BUILD:
         printing.log_success(
-            f"\n    Saved to **{build.output_dir(state.cache_dir, config.build_name)}**"
+            f"\n    Saved to **{of_build.output_dir(state.cache_dir, config.build_name)}**"
         )
 
         return groqmodel.load(config.build_name, state.cache_dir)
@@ -137,6 +132,6 @@ def groqit(
         )
         msg = """
         groqit() only returns a GroqModel instance if the Sequence includes a Stage
-        that sets state.build_status=groqflow.build.Status.SUCCESSFUL_BUILD.
+        that sets state.build_status=onnxflow.build.Status.SUCCESSFUL_BUILD.
         """
         printing.log_warning(msg)

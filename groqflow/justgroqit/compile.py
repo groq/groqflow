@@ -3,15 +3,16 @@ import shutil
 import subprocess
 import pathlib
 import onnx
-import groqflow.justgroqit.stage as stage
-import groqflow.common.exceptions as exp
-import groqflow.common.printing as printing
+import onnxflow.justbuildit.stage as stage
+import onnxflow.common.exceptions as exp
+import onnxflow.common.printing as printing
+import onnxflow.common.build as of_build
+import onnxflow.common.onnx_helpers as onnx_helpers
 import groqflow.common.build as build
-import groqflow.common.onnx_helpers as onnx_helpers
 import groqflow.common.sdk_helpers as sdk
 
 
-def get_and_analyze_onnx(state: build.State):
+def get_and_analyze_onnx(state: build.GroqState):
     # TODO: validate this input
     # https://git.groq.io/code/Groq/-/issues/13947
     input_onnx = state.intermediate_results[0]
@@ -42,12 +43,12 @@ def get_and_analyze_onnx(state: build.State):
         Hint: you can ask groqit to build with a specific number of chips
         less than {max_chips} by setting the num_chips argument in groqit().
         """
-        raise exp.GroqitStageError(msg)
+        raise exp.StageError(msg)
 
     return input_onnx
 
 
-class CompileOnnx(stage.GroqitStage):
+class CompileOnnx(stage.Stage):
     """
     Stage that takes an ONNX file and compiles it into one or more
     Alan Assembly (.aa) files.
@@ -67,11 +68,9 @@ class CompileOnnx(stage.GroqitStage):
             monitor_message="Compiling model",
         )
 
-    def fire(self, state: build.State):
+    def fire(self, state: build.GroqState):
 
-        sdk.check_dependencies(
-            require_devtools=True, exception_type=exp.GroqitStageError
-        )
+        sdk.check_dependencies(require_devtools=True, exception_type=exp.StageError)
 
         input_onnx = get_and_analyze_onnx(state)
 
@@ -135,7 +134,7 @@ class CompileOnnx(stage.GroqitStage):
         find_files_by_extension = lambda ext: [
             os.path.join(dp, f)
             for dp, dn, filenames in os.walk(
-                build.output_dir(state.cache_dir, state.config.build_name)
+                of_build.output_dir(state.cache_dir, state.config.build_name)
             )
             for f in filenames
             if os.path.splitext(f)[1] == ext
@@ -162,7 +161,7 @@ class CompileOnnx(stage.GroqitStage):
                 # Building the IOP files qualifies the build as a success
                 # because those IOP files are the requirement for running
                 # a GroqModel instance.
-                state.build_status = build.Status.SUCCESSFUL_BUILD
+                state.build_status = of_build.Status.SUCCESSFUL_BUILD
         else:
             msg = f"""
             Attempted use Groq Compiler to compile your model's ONNX file into Groq Alan Assembly (.aa)
@@ -170,12 +169,12 @@ class CompileOnnx(stage.GroqitStage):
             Please contact GroqFlow support to determine a path forwards.
             More information may be available in the log file at **{self.logfile_path}**
             """
-            raise exp.GroqitStageError(msg)
+            raise exp.StageError(msg)
 
         return state
 
 
-class Assemble(stage.GroqitStage):
+class Assemble(stage.Stage):
     """
     Stage that takes a list of Alan Assembly (.aa) files and runs Groq
     Assembler to transform them into a list of input output program (.iop
@@ -194,16 +193,14 @@ class Assemble(stage.GroqitStage):
             monitor_message="Assembling model",
         )
 
-    def fire(self, state: build.State):
+    def fire(self, state: build.GroqState):
 
         # TODO: validate the input
         # https://git.groq.io/code/Groq/-/issues/13947
 
         if int(state.num_chips_used) == 1:
 
-            sdk.check_dependencies(
-                require_devtools=True, exception_type=exp.GroqitStageError
-            )
+            sdk.check_dependencies(require_devtools=True, exception_type=exp.StageError)
 
             # Select either bake or SDK
             if state.use_sdk:
@@ -227,7 +224,7 @@ class Assemble(stage.GroqitStage):
             sdk.check_dependencies(
                 require_devtools=True,
                 require_runtime=True,
-                exception_type=exp.GroqitStageError,
+                exception_type=exp.StageError,
             )
 
             groqit_folder = str(
@@ -286,7 +283,7 @@ class Assemble(stage.GroqitStage):
         iop_files = [
             os.path.join(dp, f)
             for dp, dn, filenames in os.walk(
-                build.output_dir(state.cache_dir, state.config.build_name)
+                of_build.output_dir(state.cache_dir, state.config.build_name)
             )
             for f in filenames
             if os.path.splitext(f)[1] == ".iop"
@@ -302,7 +299,7 @@ class Assemble(stage.GroqitStage):
             # Building the IOP files qualifies the build as a success
             # because those IOP files are the requirement for running
             # a GroqModel instance.
-            state.build_status = build.Status.SUCCESSFUL_BUILD
+            state.build_status = of_build.Status.SUCCESSFUL_BUILD
         else:
             msg = f"""
             Attempted to use Groq Assembler to convert your model's Alan Assembly (.aa files) into
@@ -310,6 +307,6 @@ class Assemble(stage.GroqitStage):
             Please contact GroqFlow support to determine a path forwards.
             More information may be available in the log file at **{self.logfile_path}**
             """
-            raise exp.GroqitStageError(msg)
+            raise exp.StageError(msg)
 
         return state
