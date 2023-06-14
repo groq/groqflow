@@ -45,7 +45,7 @@ gmodel(**inputs)                # inference with provided inputs
 
 The simplest way to use GroqFlow is by calling `groqit()` with your model and a sample input.
 
-Returns a callable `GroqModel` instance that works like a PyTorch model (torch.nn.Module) or, when given scikit-learn or xgboost inputs, has `predict` and `predict_proba` methods.
+Returns a callable `GroqModel` instance that works like a PyTorch model (torch.nn.Module) or, when given scikit-learn, xgboost, or lightgbm inputs, has `predict` and `predict_proba` methods.
 
 **model:**
 
@@ -73,6 +73,9 @@ Returns a callable `GroqModel` instance that works like a PyTorch model (torch.n
   - The following xgboost models:
     - xgboost.XGBClassifier
     - xgboost.XGBRegressor
+  - The following lightgbm models:
+    - lightgbm.LGBMClassifier
+    - lightgbm.LGBMRegressor
 
 **inputs:**
 
@@ -357,7 +360,7 @@ Keras models built with `groqit()` return an instance of `class KerasModelWrappe
  - `KerasModelWrapper` is a callable object, similar to `tf.keras.Model` (i.e., `__call__()` executes the model's call function)
  - Tensors returned by `KerasModelWrapper` will be of type `tf.Tensor`
 
-scikit-learn and xgboost models built with `groqit()` return an instance of `class HummingbirdWrapper(GroqModel)`, which is the same as a `GroqModel` except:
+scikit-learn, xgboost, and lightgbm models built with `groqit()` return an instance of `class HummingbirdWrapper(GroqModel)`, which is the same as a `GroqModel` except:
  - There is a `predict` method returning estimator/classifier results mimicking the `predict` method of scikit-learn
  - There is a `predict_proba` method returning probabilities mimicking the `predict_proba` method of scikit-learn
  - The `run` method returns two outputs corresponding to the results of `predict` and `predict_proba`.
@@ -379,7 +382,7 @@ scikit-learn and xgboost models built with `groqit()` return an instance of `cla
 - The `inputs` argument is an unpacked dictionary where the keys correspond to the arguments of your model's forward function
 
 **`HummingbirdWrapper.predict(inputs: numpy.ndarray)`**
-- Predictions from a `GroqModel` based on a scikit-learn or xgboost model can be produced with the `predict` method.
+- Predictions from a `GroqModel` based on a scikit-learn, xgboost, or lightgbm model can be produced with the `predict` method.
 
 ### Example:
 
@@ -401,6 +404,7 @@ See:
  - `examples/onnx/hello_world.py`
  - `examples/hummingbird/xgbclassifier.py`
  - `examples/hummingbird/randomforest.py`
+ - `examples/hummingbird/lgbmclassifier.py`
 
 
 ---

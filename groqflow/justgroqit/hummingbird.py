@@ -36,6 +36,14 @@ try:
 except ImportError as e:
     xgboost_available = False
 
+try:
+    from lightgbm import LGBMClassifier
+    from lightgbm import LGBMRegressor
+
+    lightgbm_available = True
+except ImportError as e:
+    lightgbm_available = False
+
 
 def is_supported_sklearn_model(model) -> bool:
     return (
@@ -60,19 +68,23 @@ def is_supported_xgboost_model(model) -> bool:
     return isinstance(model, XGBClassifier) or isinstance(model, XGBRegressor)
 
 
+def is_supported_lightgbm_model(model) -> bool:
+    return isinstance(model, LGBMClassifier) or isinstance(model, LGBMRegressor)
+
+
 def is_supported_model(model) -> bool:
-    return (sklearn_available and is_supported_sklearn_model(model)) or (
-        xgboost_available and is_supported_xgboost_model(model)
-    )
+    return (sklearn_available and is_supported_sklearn_model(model)) or \
+        (xgboost_available and is_supported_xgboost_model(model)) or \
+        (lightgbm_available and is_supported_lightgbm_model(model))
 
 
 class ConvertHummingbirdModel(stage.GroqitStage):
     """
-    Stage that takes an SKLearn or XGBoost model instance, in state.model, and
+    Stage that takes an SKLearn, XGBoost, or LightGBM model instance, in state.model, and
     converts it to an ONNX file via Hummingbird.
 
     Expected inputs:
-     - state.model is an SKLearn or XGBoost model object
+     - state.model is an SKLearn, XGBoost, or LightGBM model object
      - state.inputs is a dict of the form {"input_0": <data>} where <data>
         is a numpy array as would be provided, e.g., to sklearn's predict method.
 
@@ -98,7 +110,7 @@ class ConvertHummingbirdModel(stage.GroqitStage):
         if not is_supported_model(state.model):
             msg = f"""
             The current stage (ConvertHummingbirdModel) is only compatible with
-            certain scikit-learn and xgboost models, however the stage
+            certain scikit-learn, xgboost, and lightgbm models, however the stage
             received an unsupported model of type {type(state.model)}.
 
             Support scikit-learn models:
@@ -118,6 +130,9 @@ class ConvertHummingbirdModel(stage.GroqitStage):
 
             Supported xgboost models:
               - xgboost.XGBClassifier
+
+            Supported lightgbm models:
+              - lightgbm.LGBMClassifier
             """
             raise exp.GroqitStageError(msg)
 

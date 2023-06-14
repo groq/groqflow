@@ -20,6 +20,7 @@ setup(
         "hummingbird-ml==0.4.4",
         "scikit-learn==1.1.1",
         "xgboost==1.6.1",
+        "lightgbm==3.3.5",
         "onnxruntime>=1.10.0",
         "paramiko==2.11.0",
         "torch>=1.12.1",
