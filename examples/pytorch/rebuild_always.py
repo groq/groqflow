@@ -34,3 +34,5 @@ inputs = {"x": torch.rand(input_size)}
 
 # Build/Rebuild model
 groq_model = groqit(pytorch_model, inputs, rebuild="always")
+
+print("Example rebuild_always.py finished")

@@ -29,19 +29,10 @@ def get_multi_tsp_runner(
         "FC2_A11_2_CHIP": g.TopologyConfig.FC2_A11_2_CHIP,
         "FC2_A11_4_CHIP": g.TopologyConfig.FC2_A11_4_CHIP,
     }
-    speed_config = {
-        "DF_A14_2_CHIP": 25,
-        "DF_A14_4_CHIP": 25,
-        "DF_A14_8_CHIP": 25,
-        "FC2_A11_2_CHIP": 30,
-        "FC2_A11_4_CHIP": 30,
-    }
 
     if bringup_topology:
         print("Bringup C2C topology...")
-        tsp.bringup_topology(
-            user_config=topo_config[topology], speed=speed_config[topology]
-        )
+        tsp.bringup_topology(user_config=topo_config[topology])
 
     program_name = "output"
     tsp_runner = tsp.create_multi_tsp_runner(
@@ -49,7 +40,6 @@ def get_multi_tsp_runner(
         compile_dir,
         program_name,
         user_config=topo_config[topology],
-        speed=speed_config[topology],
     )
     return tsp_runner
 

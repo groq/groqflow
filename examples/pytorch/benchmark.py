@@ -34,3 +34,5 @@ performance = gmodel.benchmark()
 print("Your build's estimated performance is:")
 print(f"{performance.latency:.7f} {performance.latency_units}")
 print(f"{performance.throughput:.1f} {performance.throughput_units}")
+
+print("Example benchmark.py finished")

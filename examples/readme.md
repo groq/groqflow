@@ -72,3 +72,4 @@ python /path/to/example/example_name.py
 | `pytorch/rebuild_always.py` | `groqit()`'s caching behavior when the `rebuild` argument is set to "always" |
 | `pytorch/rebuild_never.py` | groqit()'s caching behavior when the `rebuild` argument is set to "never" |
 | `pytorch/run_abunch.py` | running multiple inputs at a time with the `run_abunch()` method |
+| `pytorch/sequence.py` | the `sequence` argument for changing the default GroqFlow steps for porting your model |

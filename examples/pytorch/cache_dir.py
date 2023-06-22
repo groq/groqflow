@@ -45,3 +45,5 @@ groqit(pytorch_model, inputs, cache_dir=my_local_cache, build_name="my_cache_dir
 print(
     f"\nCheck out the cache created in the local directory by running 'ls {my_local_cache}'"
 )
+
+print("Example cache_dir.py finished")

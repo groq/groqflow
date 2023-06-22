@@ -44,3 +44,5 @@ groq_outputs = groq_model(**inputs)
 # Print Keras and Groq results
 print(f"Keras_outputs: {keras_outputs}")
 print(f"Groq_outputs: {groq_outputs}")
+
+print("Example hello_world.py finished")
