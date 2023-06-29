@@ -32,3 +32,5 @@ gmodel = groqit(pytorch_model, inputs, groqview=True)
 
 # Open GroqView
 gmodel.groqview()
+
+print("Example groqview.py finished")

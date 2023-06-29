@@ -16,6 +16,7 @@ The following reviews the different functionality provided by GroqFlow.
   - [Assembler Flags](#assembler-flags)
   - [Choose a Cache Directory](#choose-a-cache-directory)
   - [Perform Post-training Quantization](#perform-post-training-quantization)
+  - [Custom User Sequence](#custom-user-sequence)
 - [GroqModel Methods](#groqmodel-methods)
   - [GroqModel Class](#groqmodel-class)
   - [GroqModel Specializations](#groqmodel-specializations)
@@ -323,6 +324,30 @@ gmodel = groqit(model, inputs, quantization_samples=my_samples)
 ```
 
 See: `examples/pytorch/quantization.py`
+
+---
+
+### Custom User Sequence
+
+By default, GroqFlow completes the following steps:
+ 1. Convert to ONNX
+ 1. Optimize ONNX file
+ 1. Check op support
+ 1. Convert to FP16
+ 1. Compile Model
+ 1. Assemble Model
+
+Users may wish to alter the default flow to skip a step, for example, FP16 conversion. **Note**: if the `Convert to FP16` step is disabled, the user must ensure that the model uses data types that the Groq hardware supports.
+
+For more information on `Sequence`, see [Sequence and Stage Classes](https://github.com/groq/mlagility/blob/main/docs/code.md#sequence-and-stage-classes) on MLAgility.
+
+### Example:
+
+```
+gmodel = groqit(model, inputs, sequence=user_sequence)
+```
+
+See: `examples/pytorch/sequence.py`
 
 ---
 

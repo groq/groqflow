@@ -31,6 +31,8 @@ The following tasks are required to enable running proof point scripts:
 - Pip install the helper files for the proof points
   - `pip install -e {path_to}/groqflow/demo_helpers`
 
+**Note:** On GroqNode™ systems you will may run into an installation error that suggests that you install with the `--user` flag. If you encounter this error, please try `pip install -e {path_to}/groqflow/demo_helpers --user`.
+
 ## Support Matrix
 
 The following relates the proof point models with the version of the GroqWare Suite (SDK) in which they are supported.

@@ -38,3 +38,5 @@ performance = gmodel.benchmark_abunch(input_collection=abunch_o_inputs)
 print("Your build's estimated performance is:")
 print(f"{performance.latency:.7f} {performance.latency_units}")
 print(f"{performance.throughput:.1f} {performance.throughput_units}")
+
+print("Example benchmark_abunch.py finished")

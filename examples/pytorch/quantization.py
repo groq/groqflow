@@ -72,3 +72,5 @@ if __name__ == "__main__":
     print(
         "Results of PyTorch model and quantized GroqModel do {}match.".format(match_str)
     )
+
+    print("Example quantization.py finished")

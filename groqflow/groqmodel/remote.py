@@ -261,7 +261,7 @@ class RemoteClient:
 
     def execute(
         self,
-        state: build.State,
+        state: build.GroqState,
         repetitions: int,
     ) -> Dict[str, np.ndarray]:
         """
