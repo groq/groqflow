@@ -65,7 +65,6 @@ class TopologyState:
 
 class GroqModel:
     def __init__(self, state: build.GroqState, tensor_type=np.array, input_dtypes=None):
-
         self.input_dtypes = input_dtypes
         self.tensor_type = tensor_type
         self.state = state
@@ -195,7 +194,6 @@ class GroqModel:
     def benchmark_abunch(
         self, input_collection: Collection, repetitions: int = 1
     ) -> GroqMeasuredPerformance:
-
         self._validate_input_collection(input_collection, "benchmark_abunch")
 
         _, benchmark_results = self._execute(
@@ -244,7 +242,10 @@ class GroqModel:
         # Check whether the inputs provided have the shapes required by the model's
         # forward function
         tensor_helpers.check_shapes_and_dtypes(
-            inputs, self.state.expected_input_shapes, self.state.expected_input_dtypes
+            inputs,
+            self.state.expected_input_shapes,
+            self.state.expected_input_dtypes,
+            self.state.downcast_applied,
         )
 
     def _select_backend(self):
@@ -290,7 +291,6 @@ class GroqModel:
                     )
                 )
         elif backend == build.Backend.REMOTE:
-
             try:
                 import groqflow.groqmodel.remote as remote
 
@@ -339,7 +339,9 @@ class GroqModel:
             raise exp.Error(msg)
 
         # Save inputs to file
-        to_downcast = False if self.state.quantization_samples else True
+        to_downcast = (
+            False if self.state.quantization_samples else self.state.downcast_applied
+        )
         tensor_helpers.save_inputs(
             input_collection,
             self.state.execution_inputs_file,
@@ -490,7 +492,6 @@ class GroqModel:
 
     # Launch groqview
     def groqview(self) -> None:
-
         # Select either bake or SDK
         if self.state.use_sdk:
             groqview_path = sdk.find_tool("groqview")

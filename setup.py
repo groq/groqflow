@@ -27,7 +27,7 @@ setup(
         "pyyaml>=5.4",
         "typeguard>=2.3.13",
         "packaging>=21.3",
-        "mlagility==3.1.5",
+        "mlagility==3.2.0",
     ],
     extras_require={
         "tensorflow": ["tensorflow-cpu>=2.8.1", "tf2onnx>=1.12.0"],
