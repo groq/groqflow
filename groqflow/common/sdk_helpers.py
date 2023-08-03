@@ -8,8 +8,8 @@ import subprocess
 import shutil
 from typing import Type, Union
 from pkg_resources import parse_version
+import onnxflow.common.exceptions as exp
 import groqflow.common.build as build
-import groqflow.common.exceptions as exp
 
 
 MIN_RELEASE_VERSION = "0.9.2.1"
@@ -29,7 +29,7 @@ def get_num_chips_available(pci_devices=None):
     elif os.path.isfile("/usr/bin/lspci"):
         lspci = "/usr/bin/lspci"
     else:
-        raise exp.GroqModelEnvError("lspci not found")
+        raise exp.EnvError("lspci not found")
 
     # Capture the list of pci devices on the system using the linux lspci utility
     if pci_devices is None:
@@ -61,7 +61,7 @@ def find_tool(tool, soft_fail=False):
     elif soft_fail:
         return False
     else:
-        raise exp.GroqitStageError(f"{tool} not found")
+        raise exp.StageError(f"{tool} not found")
 
 
 def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]:
@@ -76,7 +76,7 @@ def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]
             cmd = ["apt-cache", "policy", package]
             package_info = subprocess.check_output(cmd).decode("utf-8").split("\n")
         except (FileNotFoundError, subprocess.CalledProcessError) as e:
-            raise exp.GroqFlowError("apt-cache policy command failed") from e
+            raise exp.Error("apt-cache policy command failed") from e
 
         # Return False if package was not found
         if len(package_info) == 1:
@@ -91,7 +91,7 @@ def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]
         try:
             package_info = subprocess.check_output(cmd).decode("utf-8").split("\n")
         except FileNotFoundError as e:
-            raise exp.GroqFlowError("dnf info command failed") from e
+            raise exp.Error("dnf info command failed") from e
         except subprocess.CalledProcessError as e:
             # Return False if package was not found
             return False
@@ -102,7 +102,7 @@ def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]
     else:
         # The following exception will only be raised if a GroqFlow dev forgets to update
         # _installed_package_version() when adding support for a new OS
-        raise exp.GroqitEnvError(
+        raise exp.EnvError(
             f"_installed_package_version not implemented for {os_version}"
         )
 
@@ -126,7 +126,7 @@ def version_is_valid(
     sdkv: Union[str, bool],
     required: bool,
     requirement_name: str,
-    exception_type: Type[Exception] = exp.GroqitEnvError,
+    exception_type: Type[Exception] = exp.EnvError,
     hint: str = "",
 ):
     """
@@ -160,7 +160,7 @@ def validate_os_version() -> OS:
 
     # Check if this is a linux-based OS
     if not os.path.isfile("/etc/os-release"):
-        raise exp.GroqitEnvError(unsupported_os_msg)
+        raise exp.EnvError(unsupported_os_msg)
 
     # Parse OS-release data
     with open("/etc/os-release", encoding="utf-8") as f:
@@ -171,7 +171,7 @@ def validate_os_version() -> OS:
 
     # Check if OS is supported
     if os_release["NAME"] not in supported_os_names:
-        raise exp.GroqitEnvError(unsupported_os_msg)
+        raise exp.EnvError(unsupported_os_msg)
 
     return OS(os_release["NAME"])
 
@@ -179,7 +179,7 @@ def validate_os_version() -> OS:
 def validate_devtools(
     os_version: OS,
     required=False,
-    exception_type: Type[Exception] = exp.GroqitEnvError,
+    exception_type: Type[Exception] = exp.EnvError,
 ) -> Union[bool, str]:
     version = _installed_package_version("groq-devtools", os_version)
     hint = "Please contact sales@groq.com to get access to groq-devtools."
@@ -189,7 +189,7 @@ def validate_devtools(
 def validate_runtime(
     os_version: OS,
     required=False,
-    exception_type: Type[Exception] = exp.GroqitEnvError,
+    exception_type: Type[Exception] = exp.EnvError,
 ) -> Union[bool, str]:
     version = _installed_package_version("groq-runtime", os_version)
     hint = "Please contact sales@groq.com to get access to groq-runtime."
@@ -213,7 +213,7 @@ def get_repo_root():
 
 def validate_bake():
     if not shutil.which("bake"):
-        raise exp.GroqitEnvError(
+        raise exp.EnvError(
             (
                 "Bake must be available when the env var "
                 f'{build.environment_variables["dont_use_sdk"]} is set to True'
@@ -225,7 +225,7 @@ def validate_bake():
     groq_root = repo.split("/")[-1] == "Groq"
 
     if err:
-        raise exp.GroqitEnvError(
+        raise exp.EnvError(
             (
                 "You must be inside the Groq repo when the env var "
                 f'{build.environment_variables["dont_use_sdk"]} is set to True. '
@@ -234,7 +234,7 @@ def validate_bake():
         )
 
     elif not groq_root:
-        raise exp.GroqitEnvError(
+        raise exp.EnvError(
             (
                 "You must be inside the Groq repo when the env var "
                 f'{build.environment_variables["dont_use_sdk"]} is set to True. '
@@ -246,7 +246,7 @@ def validate_bake():
 def check_dependencies(
     require_devtools: bool = False,
     require_runtime: bool = False,
-    exception_type: Type[Exception] = exp.GroqitEnvError,
+    exception_type: Type[Exception] = exp.EnvError,
 ):
 
     # Skip dependency check if necessary
@@ -260,13 +260,19 @@ def check_dependencies(
     # Skip all checks if using CI
     else:
         os_version = validate_os_version()
-        validate_devtools(
-            os_version=os_version,
-            required=require_devtools,
-            exception_type=exception_type,
-        )
-        validate_runtime(
-            os_version=os_version,
-            required=require_runtime,
-            exception_type=exception_type,
-        )
+
+        # Only check for the package that is required
+        if require_devtools:
+            validate_devtools(
+                os_version=os_version,
+                required=require_devtools,
+                exception_type=exception_type,
+            )
+
+        # Only check for the package that is required
+        if require_runtime:
+            validate_runtime(
+                os_version=os_version,
+                required=require_runtime,
+                exception_type=exception_type,
+            )

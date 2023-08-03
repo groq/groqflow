@@ -50,3 +50,5 @@ groq_model_2 = groqit(pytorch_model_2, inputs, build_name="Thing_2")
 
 print("\nNote that each build is saved to their own build directories")
 print("as indicated at the completion of each build above.")
+
+print("Example build_name.py finished")

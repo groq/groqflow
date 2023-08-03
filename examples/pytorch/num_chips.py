@@ -44,3 +44,5 @@ print(
     "\nThe number of GroqChip processors required to run the build is "
     f"{gmodel.state.num_chips_used}."
 )
+
+print("Example num_chips.py finished")

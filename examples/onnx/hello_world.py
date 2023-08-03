@@ -74,3 +74,5 @@ groq_outputs = groq_model.run(inputs)
 # Print ONNX and Groq results
 print(f"Groq_outputs: {groq_outputs}")
 print(f"Onnx_outputs: {onnx_outputs}")
+
+print("Example hello_world.py finished")

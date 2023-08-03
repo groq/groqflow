@@ -8,13 +8,13 @@ from collections.abc import Collection
 from dataclasses import dataclass
 import numpy as np
 import torch
-
-import groqflow.common.exceptions as exp
-import groqflow.common.printing as printing
+import onnxflow.common.exceptions as exp
+import onnxflow.common.printing as printing
+import onnxflow.common.tensor_helpers as tensor_helpers
+import onnxflow.common.tf_helpers as tf_helpers
+import onnxflow.common.build as of_build
 import groqflow.common.build as build
 import groqflow.common.sdk_helpers as sdk
-import groqflow.common.tensor_helpers as tensor_helpers
-import groqflow.common.tf_helpers as tf_helpers
 
 
 @dataclass
@@ -64,14 +64,13 @@ class TopologyState:
 
 
 class GroqModel:
-    def __init__(self, state: build.State, tensor_type=np.array, input_dtypes=None):
-
+    def __init__(self, state: build.GroqState, tensor_type=np.array, input_dtypes=None):
         self.input_dtypes = input_dtypes
         self.tensor_type = tensor_type
         self.state = state
         self.remote_client = None
         self.log_execute_path = os.path.join(
-            build.output_dir(state.cache_dir, self.state.config.build_name),
+            of_build.output_dir(state.cache_dir, self.state.config.build_name),
             "log_execute.txt",
         )
 
@@ -127,7 +126,9 @@ class GroqModel:
         """
 
         # Get the number of cycles needed to execute the model
-        on_chip_compute_cycles = build.load_yaml(self.state.stats_file)["total_cycles"]
+        on_chip_compute_cycles = of_build.load_yaml(self.state.stats_file)[
+            "total_cycles"
+        ]
 
         # TODO: Read the frequency from a central location once the issue below is solved
         # https://git.groq.io/code/Groq/-/issues/14155
@@ -193,7 +194,6 @@ class GroqModel:
     def benchmark_abunch(
         self, input_collection: Collection, repetitions: int = 1
     ) -> GroqMeasuredPerformance:
-
         self._validate_input_collection(input_collection, "benchmark_abunch")
 
         _, benchmark_results = self._execute(
@@ -208,7 +208,7 @@ class GroqModel:
 
     def _validate_input_collection(self, input_collection, function_name) -> None:
         if input_collection is None:
-            raise exp.GroqModelArgError(
+            raise exp.ModelArgError(
                 (
                     f"GroqModel.{function_name}() received an input_collection with type "
                     f"{type(input_collection)}, however the input_collection arg must be "
@@ -217,7 +217,7 @@ class GroqModel:
             )
         else:
             if len(input_collection) == 0:
-                raise exp.GroqModelArgError(
+                raise exp.ModelArgError(
                     f"GroqModel.{function_name}() received an empty collection as input."
                 )
 
@@ -232,7 +232,7 @@ class GroqModel:
             collection_msg = ""
 
         if not isinstance(inputs, dict):
-            raise exp.GroqModelArgError(
+            raise exp.ModelArgError(
                 (
                     f"GroqModel.{function_name}() {collection_msg}received inputs of type "
                     f"{type(inputs)}, however the inputs must be a dictionary."
@@ -242,7 +242,10 @@ class GroqModel:
         # Check whether the inputs provided have the shapes required by the model's
         # forward function
         tensor_helpers.check_shapes_and_dtypes(
-            inputs, self.state.expected_input_shapes, self.state.expected_input_dtypes
+            inputs,
+            self.state.expected_input_shapes,
+            self.state.expected_input_dtypes,
+            self.state.downcast_applied,
         )
 
     def _select_backend(self):
@@ -277,24 +280,23 @@ class GroqModel:
         # Check if we are trying to use GroqFlow Remote/Cloud on a public release
         if backend == build.Backend.CLOUD:
             try:
-                import mlagility.api.cloud as cloud  # pylint: disable=import-error
+                import mlagility.api.devices as cloud  # pylint: disable=import-error
 
                 sys.modules["cloud"] = cloud
             except ModuleNotFoundError:
-                raise exp.GroqModelEnvError(
+                raise exp.EnvError(
                     (
                         'To use GroqFlow "cloud" backend please install mlagility. '
                         "You can find more information at github.com/groq/mlagility."
                     )
                 )
         elif backend == build.Backend.REMOTE:
-
             try:
                 import groqflow.groqmodel.remote as remote
 
                 sys.modules["remote"] = remote
             except ModuleNotFoundError:
-                raise exp.GroqModelEnvError(
+                raise exp.EnvError(
                     (
                         f"GroqFlow {backend.value} is not publicly available yet. "
                         "Please set the environment variable GROQMODEL_BACKEND to 'local'."
@@ -334,10 +336,12 @@ class GroqModel:
                 "but the current runtime only allows for up to 8 GroqChips."
             )
 
-            raise exp.GroqFlowError(msg)
+            raise exp.Error(msg)
 
         # Save inputs to file
-        to_downcast = False if self.state.quantization_samples else True
+        to_downcast = (
+            False if self.state.quantization_samples else self.state.downcast_applied
+        )
         tensor_helpers.save_inputs(
             input_collection,
             self.state.execution_inputs_file,
@@ -357,13 +361,13 @@ class GroqModel:
         backend = self._select_backend()
         if backend == build.Backend.CLOUD:
             sys.modules["cloud"].execute_groqchip_remotely(
-                bringup_topology, repetitions, self.state, self.log_execute_path
+                bringup_topology, repetitions, self.state
             )
         elif backend == build.Backend.REMOTE:
             try:
                 self.remote_client.execute(self.state, repetitions)
             except Exception as e:
-                raise exp.GroqModelRemoteError(
+                raise exp.Error(
                     (
                         "There was an issue when running your model using GroqFlow Remote. "
                     )
@@ -400,7 +404,7 @@ class GroqModel:
         num_outputs = len(output_nodes)
         output_nodes_received = list(np_result[0].keys())
         if not all(node in output_nodes for node in output_nodes_received):
-            raise exp.GroqModelRuntimeError(
+            raise exp.ModelRuntimeError(
                 (
                     f"GroqFlow expected outputs {str(self.state.expected_output_names)} "
                     f"but got {str(output_nodes_received)}"
@@ -434,7 +438,7 @@ class GroqModel:
         src_folder = pathlib.Path(__file__).parent.resolve()
         chips_available = sdk.get_num_chips_available()
         if self.state.num_chips_used > chips_available:
-            raise exp.GroqModelRuntimeError(
+            raise exp.ModelRuntimeError(
                 f"Trying to execute a model compiled for {self.state.num_chips_used}"
                 f" GroqChip processors but this machine only has {chips_available}"
                 " GroqChip processors available."
@@ -456,7 +460,7 @@ class GroqModel:
             ]
         cmd = execution_script + [
             str(self.state.num_chips_used),
-            build.output_dir(self.state.cache_dir, self.state.config.build_name),
+            of_build.output_dir(self.state.cache_dir, self.state.config.build_name),
             self.state.outputs_file,
             self.state.latency_file,
             self.state.topology,
@@ -469,7 +473,7 @@ class GroqModel:
         try:
             # FIXME: STDOUT is only saved when the process succeeds (STDERR always saved)
             # https://git.groq.io/code/Groq/-/issues/13876
-            sys.stderr = build.Logger(self.log_execute_path)
+            sys.stderr = of_build.Logger(self.log_execute_path)
             output = subprocess.check_output(cmd)
             print(output.decode("utf-8"), file=sys.stderr)
             sys.stderr = sys.stderr.terminal
@@ -484,11 +488,10 @@ class GroqModel:
             else:
                 msg = "Failed while trying to run GroqChips locally. "
             msg = msg + f"Refer to **{self.log_execute_path}** for details."
-            raise exp.GroqModelRuntimeError(msg) from e
+            raise exp.ModelRuntimeError(msg) from e
 
     # Launch groqview
     def groqview(self) -> None:
-
         # Select either bake or SDK
         if self.state.use_sdk:
             groqview_path = sdk.find_tool("groqview")
@@ -501,7 +504,7 @@ class GroqModel:
 
         # Check if the groqview file exists
         if not os.path.isdir(self.state.groqview_file):
-            raise exp.GroqFlowError(
+            raise exp.Error(
                 "GroqView directory not found. Please recompile your model with groqview=True"
             )
 
@@ -515,7 +518,7 @@ class GroqModel:
     def netron(self) -> None:
         # Check if Netron is installed
         if not shutil.which("netron"):
-            raise exp.GroqitEnvError("Netron installation not found.")
+            raise exp.EnvError("Netron installation not found.")
 
         # Launch netron
         subprocess.Popen(["netron", self.state.opt_onnx_file]).wait()
@@ -566,11 +569,11 @@ class HummingbirdWrapper(GroqModel):
 def load(build_name: str, cache_dir=build.DEFAULT_CACHE_DIR) -> GroqModel:
     state = build.load_state(cache_dir=cache_dir, build_name=build_name)
 
-    if state.model_type == build.ModelType.PYTORCH:
+    if state.model_type == of_build.ModelType.PYTORCH:
         return PytorchModelWrapper(state)
-    elif state.model_type == build.ModelType.KERAS:
+    elif state.model_type == of_build.ModelType.KERAS:
         return KerasModelWrapper(state)
-    elif state.model_type == build.ModelType.HUMMINGBIRD:
+    elif state.model_type == of_build.ModelType.HUMMINGBIRD:
         return HummingbirdWrapper(state)
     else:
         return GroqModel(state)

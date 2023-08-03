@@ -33,3 +33,5 @@ print("SKLearn classification report")
 print(classification_report(y_test, skl_model.predict(x_test)))
 print("Groq classification report")
 print(classification_report(y_test, groq_model.predict(x_test)))
+
+print("Example randomforest.py finished")

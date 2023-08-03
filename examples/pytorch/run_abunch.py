@@ -43,3 +43,5 @@ abunch_o_outputs = groq_model.run_abunch(input_collection=abunch_o_inputs)
 # Print abunch of outputs
 for count, output in enumerate(abunch_o_outputs):
     print(f"output {count}: {list(output.numpy())}")
+
+print("Example run_abunch.py finished")
