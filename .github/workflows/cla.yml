@@ -22,7 +22,7 @@ jobs:
           path-to-document: "https://github.com/groq/groqflow/cla.md"
           # branch should not be protected
           branch: "main"
-          allowlist: jeremyfowers,vgodsoe-groq,bot*
+          allowlist: hozen-groq,MihailoMilenkovic,bot*
           remote-organization-name: groq
           remote-repository-name: cla
 
