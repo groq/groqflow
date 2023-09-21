@@ -45,29 +45,7 @@ To Groq a PyTorch model, simply provide your model and inputs to the `groqit()` 
 
 ## Contributors
 
-GroqFlow development is primarily conducted within Groq's internal repo and is periodically synced to GitHub. This approach means that developer contributions are not immediately obvious in the commit log. The following awesome developers have contributed to GroqFlow (order is alphabetical):
-
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center"><a href="https://www.linkedin.com/in/danielholandanoronha"><img src="https://avatars.githubusercontent.com/u/9607530?v=4" width="100px;" alt="Daniel Holanda"/><br /><sub><b>Daniel Holanda</b></sub></a><br /></td>
-      <td align="center"><a href="https://github.com/jeremyfowers"><img src="https://avatars.githubusercontent.com/u/80718789?v=4" width="100px;" alt="Jeremy Fowers"/><br /><sub><b>Jeremy Fowers</b></sub></a><br /></td>
-      <td align="center"><a href="https://github.com/levzlotnik"><img src="https://avatars.githubusercontent.com/levzlotnik" width="100px;" alt="Lev Zlotnik"/><br /><sub><b>Lev Zlotnik</b></sub></a><br /></td>
-      <td align="center"><a href="https://www.linkedin.com/in/philipcolangelo"><img src="https://lh3.googleusercontent.com/pw/AMWts8CciuaYWKT-YVg86giohRGuQI8Jqm3xYeWlkEh41jO4EuPTSn0FLwHp8m0FfLHLIxJOWOxuBRyppa3blDT_YcKokVFbI6yHBYJ1env5evNRCFUPiIBhIlkOzVKMrMMC7aoTjrBGSk6HWUJ803DvMKFudw=s1426-no?authuser=0" width="100px;" alt="Philip Colangelo"/><br /><sub><b>Philip Colangelo</b></sub></a><br /></td>
-      <td align="center"><a href="https://www.linkedin.com/in/ramakrishnansivakumar/"><img src="https://media.licdn.com/dms/image/D5603AQGH0fQ4EWzmnw/profile-displayphoto-shrink_800_800/0/1675440402753?e=1692230400&v=beta&t=Lm44fMhYcYHFKVRUraHZDJAzS3IpOuijsp05XbTkVL8" width="100px;" alt="Ramakrishnan Sivakumar"/><br /><sub><b>Ramakrishnan Sivakumar</b></sub></a><br /></td>
-      <td align="center"><a href="https://www.linkedin.com/in/sarah-garrod-massengill-76262728/"><img src="https://media.licdn.com/dms/image/D5635AQGd3_jmheGW7g/profile-framedphoto-shrink_800_800/0/1685551437072?e=1687186800&v=beta&t=jTqUpYhEp6UDl47N6Tl-u7J4jFJ7Y5iFlYlc4JpmUPs" width="100px;" alt="Sarah Garrod Massengill"/><br /><sub><b>Sarah Garrod Massengill</b></sub></a><br /></td>
-      <td align="center"><a href="https://github.com/vgodsoe-groq"><img src="https://avatars.githubusercontent.com/u/105250658?v=4" width="100px;" alt="Victoria Godsoe"/><br /><sub><b>Victoria Godsoe</b></sub></a><br /></td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
-
-<!-- ALL-CONTRIBUTORS-LIST:END -->
+GroqFlow development is primarily conducted within Groq's internal repo and is periodically synced to GitHub. This approach means that developer contributions are not immediately obvious in the commit log.
 
 This project follows the [all-contributors](https://allcontributors.org) specification.
 Contributions of any kind are welcome!

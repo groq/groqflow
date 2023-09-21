@@ -26,8 +26,6 @@ def get_multi_tsp_runner(
         "DF_A14_2_CHIP": g.TopologyConfig.DF_A14_2_CHIP,
         "DF_A14_4_CHIP": g.TopologyConfig.DF_A14_4_CHIP,
         "DF_A14_8_CHIP": g.TopologyConfig.DF_A14_8_CHIP,
-        "FC2_A11_2_CHIP": g.TopologyConfig.FC2_A11_2_CHIP,
-        "FC2_A11_4_CHIP": g.TopologyConfig.FC2_A11_4_CHIP,
     }
 
     if bringup_topology:
@@ -91,7 +89,7 @@ def run(
     forward = forward_singlechip if num_chips == 1 else forward_multichip
     batch_size = len(input_batch)
     output_batch = []
-    total_latency = 0
+    total_latency = 0.0
     for idx in range(batch_size):
         example = input_batch[idx]
         latency, output = rtime(forward, repetitions, example)

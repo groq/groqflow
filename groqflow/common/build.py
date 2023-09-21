@@ -1,20 +1,21 @@
 import os
 import enum
 import math
-from typing import Optional, List
+from typing import Optional, List, Dict
 import dataclasses
 import onnxflow.common.build as of_build
 from groqflow.version import __version__ as groqflow_version
 
 
-DEFAULT_ONNX_OPSET = 14
-MINIMUM_ONNX_OPSET = 11
-
+DEFAULT_ONNX_OPSET = 16
+MINIMUM_ONNX_OPSET = 13
 
 # Identifiers for specific GroqCard Accelerators
 GROQCARD_A14 = "A1.4"
-GROQCARD_A11 = "A1.1"
 
+# Identifiers for specific chip topologies
+DRAGONFLY = "Dragonfly"
+ROTATIONAL = "Rotational"
 
 # WARNING: The "internal" env var may cause unexpected behavior if enabled
 # outside of the internal Groq dev environment.
@@ -22,7 +23,6 @@ environment_variables = {
     "cache_dir": "GROQFLOW_CACHE_DIR",
     "rebuild": "GROQIT_REBUILD_POLICY",
     "dont_use_sdk": "GROQFLOW_BAKE_SDK",
-    "target_a11": "GROQFLOW_LEGACY_A11",
     "debug": "GROQFLOW_DEBUG",
     "internal": "GROQFLOW_INTERNAL_FEATURES",
 }
@@ -56,12 +56,12 @@ if os.environ.get(environment_variables["dont_use_sdk"]) == "True":
 else:
     USE_SDK = True
 
-# Direct builds to target legacy GroqCard A1.1 accelerators instead
-# of the default A1.4 accelerators
-if os.environ.get(environment_variables["target_a11"]) == "True":
-    GROQCARD = GROQCARD_A11
-else:
-    GROQCARD = GROQCARD_A14
+# Direct builds to target the default GroqCard A1.4 accelerators.
+GROQCARD = GROQCARD_A14
+
+# By default, choose the dragonfly topology. Users can change this by passing in
+# the topology argument to groqit().
+TOPOLOGY = DRAGONFLY
 
 
 class Backend(enum.Enum):
@@ -71,15 +71,50 @@ class Backend(enum.Enum):
     REMOTE = "remote"
 
 
-def supported_topology(groqcard: str):
-    if os.environ.get(environment_variables["internal"]) == "True":
-        return [1, 2, 4] if groqcard == GROQCARD_A11 else [1, 2, 4, 8, 16, 32, 64]
+def supported_topology(groqcard: str, topology: str) -> Dict[int, str]:
+    """
+    Return a map of the number of chips to the topology string, given a groqcard
+    and connection topology. Only groqcard value of GROQCARD_A14 and topologies
+    of value DRAGONFLY, ROTATIONAL are currently supported.
+    """
+
+    topo_df_a14 = {
+        2: "DF_A14_2_CHIP",
+        4: "DF_A14_4_CHIP",
+        8: "DF_A14_8_CHIP",
+        16: "DF_A14_16_CHIP",
+        32: "DF_A14_32_CHIP",
+        64: "DF_A14_64_CHIP",
+    }
+    topo_rt_a14 = {
+        16: "RT09_A14_16_CHIP",
+        32: "RT09_A14_32_CHIP",
+        40: "RT09_A14_40_CHIP",
+        48: "RT09_A14_48_CHIP",
+        56: "RT09_A14_56_CHIP",
+        64: "RT09_A14_64_CHIP",
+        72: "RT09_A14_72_CHIP",
+    }
+
+    if groqcard != GROQCARD_A14:
+        return {}
+
+    if topology == DRAGONFLY:
+        return topo_df_a14
+    elif topology == ROTATIONAL:
+        return topo_rt_a14
     else:
-        return [1, 2, 4] if groqcard == GROQCARD_A11 else [1, 2, 4, 8]
+        return {}
 
 
-def max_chips(groqcard: str):
-    return supported_topology(groqcard)[-1]
+def max_chips(groqcard: str, topology: str):
+    chips = list(supported_topology(groqcard, topology).keys())
+    if len(chips) == 0:
+        raise ValueError(
+            f"Could not find the number of chips for groqcard {groqcard}, "
+            f"topology {topology}."
+        )
+    return chips[-1]
 
 
 # Each chip can hold approximately 50M parameters
@@ -113,10 +148,11 @@ class GroqConfig(of_build.Config):
     breaking change.
     """
 
-    compiler_flags: List[str] = None
-    assembler_flags: List[str] = None
+    compiler_flags: Optional[List[str]] = None
+    assembler_flags: Optional[List[str]] = None
     groqview: bool = False
     groqcard: str = GROQCARD
+    topology: str = TOPOLOGY
     num_chips: Optional[int] = None
 
 
@@ -145,9 +181,9 @@ class GroqInfo(of_build.Info):
     estimated_pcie_output_latency: Optional[float] = None
     estimated_throughput: Optional[float] = None
     estimated_latency: Optional[float] = None
-    compiled_onnx_input_bytes: int = None
-    compiled_onnx_output_bytes: int = None
-    compiler_ram_bytes: float = None
+    compiled_onnx_input_bytes: Optional[int] = None
+    compiled_onnx_output_bytes: Optional[int] = None
+    compiler_ram_bytes: Optional[float] = None
 
 
 @dataclasses.dataclass
@@ -213,26 +249,9 @@ class GroqState(of_build.State):
 
     @property
     def topology(self):
-        topo_a14 = {
-            1: "n/a",
-            2: "DF_A14_2_CHIP",
-            4: "DF_A14_4_CHIP",
-            8: "DF_A14_8_CHIP",
-            16: "DF_A14_16_CHIP",
-            32: "DF_A14_32_CHIP",
-            64: "DF_A14_64_CHIP",
-        }
-        topo_a11 = {
-            1: "n/a",
-            2: "FC2_A11_2_CHIP",
-            4: "FC2_A11_4_CHIP",
-        }
-
-        # Select topology based on the groqcard gen
-        if self.config.groqcard == GROQCARD_A11:
-            return topo_a11[self.num_chips_used]
-        elif self.config.groqcard == GROQCARD_A14:
-            return topo_a14[self.num_chips_used]
+        topology = supported_topology(self.config.groqcard, self.config.topology)
+        if self.num_chips_used in topology.keys():
+            return topology[self.num_chips_used]
         else:
             return "Unknown"
 

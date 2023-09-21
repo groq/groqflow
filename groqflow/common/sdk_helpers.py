@@ -180,7 +180,7 @@ def validate_devtools(
     os_version: OS,
     required=False,
     exception_type: Type[Exception] = exp.EnvError,
-) -> Union[bool, str]:
+):
     version = _installed_package_version("groq-devtools", os_version)
     hint = "Please contact sales@groq.com to get access to groq-devtools."
     version_is_valid(version, required, "groq-devtools", exception_type, hint)
@@ -190,7 +190,7 @@ def validate_runtime(
     os_version: OS,
     required=False,
     exception_type: Type[Exception] = exp.EnvError,
-) -> Union[bool, str]:
+):
     version = _installed_package_version("groq-runtime", os_version)
     hint = "Please contact sales@groq.com to get access to groq-runtime."
     version_is_valid(version, required, "groq-runtime", exception_type, hint)

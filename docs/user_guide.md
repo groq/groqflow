@@ -123,6 +123,22 @@ See: `examples/num_chips.py`
 
 ---
 
+**topology**
+
+- The topology configuration of chips to use for execution. For more information on topologies,
+see the [Groq RealScale User Guide](https://support.groq.com/#/downloads/realscale).
+- *Default*: `groqit()` automatically will choose the `DRAGONFLY` topology.
+- Options are:
+  - groqflow.common.build.DRAGONFLY
+  - groqflow.common.build.ROTATIONAL
+
+### Example:
+
+```
+groqit(model, inputs, num_chips=8) # Use DRAGONFLY topology by default
+groqit(model, inputs, num_chips=16, topology=groqflow.common.build.ROTATIONAL)
+```
+
 ### Turn off the Progress Monitor
 
 GroqFlow displays a monitor on the command line that updates the progress of `groqit()` as it builds. By default, this monitor is on, however, it can be disabled using the `monitor` flag.

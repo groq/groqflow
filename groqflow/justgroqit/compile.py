@@ -33,7 +33,7 @@ def get_and_analyze_onnx(state: build.GroqState):
         state.num_chips_used = state.config.num_chips
 
     # Compile model
-    max_chips = build.max_chips(state.config.groqcard)
+    max_chips = build.max_chips(state.config.groqcard, state.config.topology)
     if not state.num_chips_used <= max_chips:
         msg = f"""
         groqit() automatically decided that {state.num_chips_used} GroqChip
@@ -81,7 +81,7 @@ class CompileOnnx(stage.Stage):
             cmd = ["bake", "r", "//Groq/Compiler:groq-compiler"]
 
         # Add multichip flag if needed
-        if int(state.num_chips_used) != 1:
+        if state.num_chips_used != 1:
             multichip_flag = f"--multichip={state.topology}"
             cmd = cmd + [multichip_flag]
 
@@ -198,7 +198,7 @@ class Assemble(stage.Stage):
         # TODO: validate the input
         # https://git.groq.io/code/Groq/-/issues/13947
 
-        if int(state.num_chips_used) == 1:
+        if state.num_chips_used == 1:
 
             sdk.check_dependencies(require_devtools=True, exception_type=exp.StageError)
 

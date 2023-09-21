@@ -18,6 +18,7 @@ def groqit(
     compiler_flags: Optional[List[str]] = None,
     assembler_flags: Optional[List[str]] = None,
     num_chips: Optional[int] = None,
+    topology: str = build.TOPOLOGY,
     groqview: bool = False,
     sequence: Optional[stage.Sequence] = None,
     quantization_samples: Collection = None,
@@ -54,6 +55,8 @@ def groqit(
         num_chips: Override the default number of GroqChip processors to be
             used instead of letting groqit decide automatically. Power users
             only.
+        topology: Override the default topology when num_chips > 1. Power users
+            only.
         groqview: If set, creates a GroqView file for the model during the
             build process. Defaults to false because this option uses up
             significant time and compute/RAM resources.
@@ -77,12 +80,13 @@ def groqit(
         groqview=groqview,
         groqcard=build.GROQCARD,
         num_chips=num_chips,
+        topology=topology,
         sequence=sequence,
     )
 
     # Analyze the user's model argument and lock in the model, inputs,
     # and sequence that will be used by the rest of groqit()
-    (model_locked, inputs_locked, sequence_locked, model_type,) = ignition.model_intake(
+    (model_locked, inputs_locked, sequence_locked, model_type) = ignition.model_intake(
         model,
         inputs,
         sequence,
@@ -136,3 +140,4 @@ def groqit(
         that sets state.build_status=onnxflow.build.Status.SUCCESSFUL_BUILD.
         """
         printing.log_warning(msg)
+        return None
