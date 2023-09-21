@@ -263,15 +263,13 @@ class RemoteClient:
         self,
         state: build.GroqState,
         repetitions: int,
-    ) -> Dict[str, np.ndarray]:
+    ):
         """
-        Executes a build on the given inputs and returns the outputs.
+        Executes a build on the given inputs and saves results to disk.
 
         Args:
             state: State of the build being executed
             repetitions: Number of times to execute a build
-        Returns:
-            The outputs of the execution
         """
         inputs_file = state.execution_inputs_file
         inputs_data = np.load(inputs_file, allow_pickle=True)

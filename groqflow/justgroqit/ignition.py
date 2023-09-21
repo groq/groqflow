@@ -105,7 +105,7 @@ default_hummingbird_sequence = stage.Sequence(
     ],
 )
 
-default_compiler_flags = []
+default_compiler_flags: List[str] = []
 
 default_assembler_flags = [
     "--ifetch-from-self",
@@ -121,14 +121,31 @@ def _validate_args(  # pylint: disable = unused-argument
     groqview: bool = False,
     groqcard: Optional[str] = build.GROQCARD_A14,
     num_chips: Optional[int] = None,
+    topology: Optional[str] = build.TOPOLOGY,
 ):
 
-    if num_chips is not None:
-        supported_topology = build.supported_topology(groqcard)
-        if num_chips not in supported_topology:
+    if groqcard is not build.GROQCARD_A14:
+        msg = f"""
+        You set groqit()'s groqcard argument to {groqcard}, which is not a supported value. The
+        currently supported value is: {build.GROQCARD_A14}.
+        """
+        raise exp.ArgError(msg)
+
+    if num_chips is not None and num_chips > 1:
+        if topology is not build.DRAGONFLY and topology is not build.ROTATIONAL:
             msg = f"""
-            You set groqit()'s num_chips argument to {num_chips} for build {build_name}, which is
-            not a supported value. Choose from the currently supported chip counts: {supported_topology}.
+            You set groqit()'s topology argument to {topology}
+            for build {build_name}, which is not a supported value. Choose from the
+            currently supported values: {build.DRAGONFLY}, {build.ROTATIONAL}.
+            """
+            raise exp.ArgError(msg)
+
+        supported_topology = build.supported_topology(groqcard, topology)
+        if num_chips not in supported_topology.keys():
+            msg = f"""
+            You set groqit()'s num_chips argument to {num_chips} with topology {topology}
+            for build {build_name}, which is not a supported value. Choose from the
+            currently supported chip counts: {supported_topology.keys()}.
             """
             raise exp.ArgError(msg)
 
@@ -176,6 +193,7 @@ def lock_config(
     groqview: bool = False,
     groqcard: Optional[str] = build.GROQCARD_A14,
     num_chips: Optional[int] = None,
+    topology: Optional[str] = build.TOPOLOGY,
     sequence: stage.Sequence = None,
 ) -> build.GroqConfig:
 
@@ -193,6 +211,7 @@ def lock_config(
         groqview=groqview,
         groqcard=groqcard,
         num_chips=num_chips,
+        topology=topology,
     )
 
     # Override the onnxflow default opset with GroqFlow's default
@@ -220,6 +239,7 @@ def lock_config(
         assembler_flags=assembler_flags,
         groqview=groqview,
         groqcard=groqcard,
+        topology=topology,
         num_chips=num_chips,
         sequence=of_config.sequence,
         onnx_opset=of_config.onnx_opset,
@@ -324,7 +344,7 @@ def model_intake(
     user_sequence: Optional[stage.Sequence],
     config: build.GroqConfig,
     user_quantization_samples: Optional[Collection] = None,
-) -> Tuple[Any, Any, stage.Sequence, of_build.ModelType, str]:
+) -> Tuple[Any, Any, stage.Sequence, of_build.ModelType]:
 
     model, inputs, sequence, model_type = of_ignition.model_intake(
         user_model=user_model,

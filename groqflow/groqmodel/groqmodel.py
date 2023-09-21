@@ -65,6 +65,7 @@ class TopologyState:
 
 class GroqModel:
     def __init__(self, state: build.GroqState, tensor_type=np.array, input_dtypes=None):
+
         self.input_dtypes = input_dtypes
         self.tensor_type = tensor_type
         self.state = state
@@ -194,6 +195,7 @@ class GroqModel:
     def benchmark_abunch(
         self, input_collection: Collection, repetitions: int = 1
     ) -> GroqMeasuredPerformance:
+
         self._validate_input_collection(input_collection, "benchmark_abunch")
 
         _, benchmark_results = self._execute(
@@ -291,6 +293,7 @@ class GroqModel:
                     )
                 )
         elif backend == build.Backend.REMOTE:
+
             try:
                 import groqflow.groqmodel.remote as remote
 
@@ -492,6 +495,7 @@ class GroqModel:
 
     # Launch groqview
     def groqview(self) -> None:
+
         # Select either bake or SDK
         if self.state.use_sdk:
             groqview_path = sdk.find_tool("groqview")
