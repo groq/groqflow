@@ -33,7 +33,12 @@ def evaluate_distilbert(rebuild_policy=None, should_execute=True):
     # generate groq model
     build_name = "distilbert"
     groq_model = groqit(
-        pytorch_model, dummy_inputs, rebuild=rebuild_policy, build_name=build_name
+        pytorch_model,
+        dummy_inputs,
+        rebuild=rebuild_policy,
+        build_name=build_name,
+        num_chips=4,
+        compiler_flags=["--partition-mode=group-fit"],
     )
 
     # compute performance on CPU and GroqChip

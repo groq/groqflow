@@ -84,9 +84,21 @@ class CompileOnnx(stage.Stage):
         if state.num_chips_used != 1:
             multichip_flag = f"--multichip={state.topology}"
             cmd = cmd + [multichip_flag]
+            if not any(
+                flag.startswith("--partition-mode=")
+                for flag in state.config.compiler_flags
+            ):
+                partition_mode_flag = "--partition-mode=daisy-chain"
+                cmd = cmd + [partition_mode_flag]
 
         if state.config.groqview:
             cmd = cmd + ["--groqview"]
+
+        # Add effort=standard by default to help with fit-ability
+        if not any(
+            flag.startswith("--effort=") for flag in state.config.compiler_flags
+        ):
+            cmd = cmd + ["--effort=standard"]
 
         # Add flags
         cmd = (

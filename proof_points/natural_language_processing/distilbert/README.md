@@ -29,4 +29,4 @@ To build and evaluate DistilBERT:
 
 ## Expected Results
 
-It takes approximately 8 minutes for DistilBERT to build and about 2 minutes to evaluate the model's accuracy. The example returns the accuracies for both the PyTorch implementation on a CPU and the Groq implementation on 2 GroqCard™ accelerators within a GroqNode™ server.
+It takes approximately 8 minutes for DistilBERT to build and about 2 minutes to evaluate the model's accuracy. The example returns the accuracies for both the PyTorch implementation on a CPU and the Groq implementation on 4 GroqCard™ accelerators within a GroqNode™ server.
