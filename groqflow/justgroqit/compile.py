@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import pathlib
 import onnx
+import torch
 import onnxflow.justbuildit.stage as stage
 import onnxflow.common.exceptions as exp
 import onnxflow.common.printing as printing
@@ -12,20 +13,7 @@ import groqflow.common.build as build
 import groqflow.common.sdk_helpers as sdk
 
 
-def get_and_analyze_onnx(state: build.GroqState):
-    # TODO: validate this input
-    # https://git.groq.io/code/Groq/-/issues/13947
-    input_onnx = state.intermediate_results[0]
-
-    (
-        state.info.compiled_onnx_input_bytes,
-        state.info.compiled_onnx_output_bytes,
-    ) = onnx_helpers.io_bytes(input_onnx)
-
-    # Count the number of trained model parameters
-    onnx_model = onnx.load(input_onnx)
-    state.info.num_parameters = int(onnx_helpers.parameter_count(onnx_model))
-
+def analyze_parameters(state: build.GroqState):
     # Automatically define the number of chips if num_chips is not provided
     if state.config.num_chips is None:
         state.num_chips_used = build.calculate_num_chips(state.info.num_parameters)
@@ -45,21 +33,68 @@ def get_and_analyze_onnx(state: build.GroqState):
         """
         raise exp.StageError(msg)
 
-    return input_onnx
+
+def analyze_onnx(state: build.GroqState):
+    # TODO: validate this input
+    # https://git.groq.io/code/Groq/-/issues/13947
+    input_onnx = state.intermediate_results[0]
+
+    (
+        state.info.compiled_model_input_bytes,
+        state.info.compiled_model_output_bytes,
+    ) = onnx_helpers.io_bytes(input_onnx)
+
+    # Count the number of trained model parameters
+    onnx_model = onnx.load(input_onnx)
+    state.info.num_parameters = int(onnx_helpers.parameter_count(onnx_model))
 
 
-class CompileOnnx(stage.Stage):
+def analyze_torch_script(state: build.GroqState):
+    model = torch.jit.load(state.torch_script_file)
+    state.info.compiled_model_input_bytes = sum(
+        t.element_size() for t in state.inputs.values()
+    )
+    outputs = model(**state.inputs)
+    state.info.compiled_model_output_bytes = sum(t.element_size() for t in outputs)
+
+    state.info.num_parameters = sum(
+        p.numel() for p in model.parameters() if p.requires_grad
+    )
+
+
+def torch_types_to_str(type: torch.dtype):
+    if type == torch.float16:
+        return "f16"
+    elif type == torch.float32:
+        return "f32"
+    elif type == torch.float64:
+        return "f64"
+    elif type == torch.uint8:
+        return "ui8"
+    elif type == torch.bool:
+        return "i1"
+    elif type == torch.int8:
+        return "i8"
+    elif type == torch.int16:
+        return "i16"
+    elif type == torch.int32:
+        return "i32"
+    elif type == torch.int64:
+        return "i64"
+    elif type == torch.chalf:
+        return "complex<f16>"
+    elif type == torch.cfloat:
+        return "complex<f32>"
+    elif type == torch.cdouble:
+        return "complex<f64>"
+    else:
+        raise TypeError("Unsupported Torch type", type)
+
+
+class Compile(stage.Stage):
     """
-    Stage that takes an ONNX file and compiles it into one or more
-    Alan Assembly (.aa) files.
-
-    Expected inputs:
-     - state.intermediate_results contains a single .onnx file
-
-    Outputs:
-     - One or more .aa files
-     - state.num_chips_used contains the number of chips used by
-        Groq Compiler
+    Base class for the Compile stage. self.input_file will be set by the
+    derived class.
     """
 
     def __init__(self):
@@ -72,7 +107,9 @@ class CompileOnnx(stage.Stage):
 
         sdk.check_dependencies(require_devtools=True, exception_type=exp.StageError)
 
-        input_onnx = get_and_analyze_onnx(state)
+        analyze_parameters(state)
+
+        input_file = state.intermediate_results[0]
 
         # Select either bake or SDK
         if state.use_sdk:
@@ -103,7 +140,7 @@ class CompileOnnx(stage.Stage):
         # Add flags
         cmd = (
             cmd
-            + [input_onnx]
+            + [input_file]
             + state.config.compiler_flags
             + [
                 "--save-stats",
@@ -184,6 +221,92 @@ class CompileOnnx(stage.Stage):
             raise exp.StageError(msg)
 
         return state
+
+
+class CompileOnnx(Compile):
+    """
+    Stage that takes an ONNX file and compiles it into one or more
+    Alan Assembly (.aa) files.
+
+    Expected inputs:
+     - state.intermediate_results contains a single .onnx file
+
+    Outputs:
+     - One or more .aa files
+     - state.num_chips_used contains the number of chips used by
+        Groq Compiler
+    """
+
+    def fire(self, state: build.GroqState):
+        analyze_onnx(state)
+        return super().fire(state)
+
+
+class CompileTorchScript(Compile):
+    """
+    Stage that takes an TorchScript file and compiles it into GTen.
+
+    Expected inputs:
+     - state.intermediate_results contains a single .pt file
+
+    Outputs:
+     - One .mlir file
+     - state.expected_output_names will contain the output names of the model.
+    """
+
+    def fire(self, state: build.GroqState):
+        analyze_torch_script(state)
+
+        # Select either bake or SDK
+        if state.use_sdk:
+            sdk.check_dependencies(require_devtools=True, exception_type=exp.StageError)
+            cmd = sdk.find_tool("groq-torch-importer")
+        else:
+            cmd = ["bake", "r", "//Groq/Compiler/Import/Torch:groq-torch-importer"]
+
+        input_types = []
+        for data in state.inputs.values():
+            shape = "x".join([str(dim) for dim in data.shape])
+            dtype = torch_types_to_str(data.dtype)
+            input_types.append(f"--input-types={shape}x{dtype}")
+
+        gten_file = os.path.join(
+            state.compile_dir,
+            f"{state.config.build_name}.gten.mlir",
+        )
+
+        cmd = cmd + [state.torch_script_file] + input_types + ["-o", gten_file]
+
+        # Remove duplicated flags
+        cmd = sorted(set(cmd), key=cmd.index)
+        state.info.torch_importer_command = " ".join(cmd)
+
+        printing.logn("Running Groq Torch Importer...")
+
+        with subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        ) as process:
+            for line in process.stdout:
+                printing.logn(line.decode("utf8"), end="")
+        printing.logn("Groq Torch Importer has exited")
+
+        state.info.torch_importer_success = (
+            True if os.path.exists(gten_file) and os.path.isfile(gten_file) else False
+        )
+
+        if state.info.torch_importer_success:
+            state.intermediate_results = [gten_file]
+        else:
+            msg = f"""
+            Attempted to use Groq Torch Importer to import TorchSript model into
+            Groq's Tensor(GTen) dialect format. However, this operation did not
+            succeed. Please contact GroqFlow support to determine a path forwards.
+            More information may be available in the log file at **{self.logfile_path}**
+            """
+            raise exp.StageError(msg)
+
+        # Compile the GTen file
+        return super().fire(state)
 
 
 class Assemble(stage.Stage):

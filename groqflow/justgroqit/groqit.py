@@ -12,7 +12,7 @@ def groqit(
     model: of_build.UnionValidModelInstanceTypes = None,
     inputs: Optional[Dict[str, Any]] = None,
     build_name: Optional[str] = None,
-    cache_dir: str = build.DEFAULT_CACHE_DIR,
+    cache_dir: Optional[str] = build.DEFAULT_CACHE_DIR,
     monitor: bool = True,
     rebuild: Optional[str] = None,
     compiler_flags: Optional[List[str]] = None,

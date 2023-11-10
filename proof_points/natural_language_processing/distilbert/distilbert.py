@@ -18,7 +18,7 @@ def evaluate_distilbert(rebuild_policy=None, should_execute=True):
     pretrained_model = "distilbert-base-uncased-finetuned-sst-2-english"
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model)
     pytorch_model = DistilBertForSequenceClassification.from_pretrained(
-        pretrained_model
+        pretrained_model, torchscript=True
     )
 
     # dummy inputs to generate the groq model
@@ -51,6 +51,8 @@ def evaluate_distilbert(rebuild_policy=None, should_execute=True):
             max_seq_length=max_seq_length,
             task="classification",
         )
+
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":

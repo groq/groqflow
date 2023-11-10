@@ -37,6 +37,8 @@ def evaluate_m5(rebuild_policy=None, should_execute=True):
             task="keyword_spotting",
         )
 
+    print(f"Proof point {__file__} finished!")
+
 
 if __name__ == "__main__":
     evaluate_m5(**parse_args())

@@ -19,7 +19,9 @@ def evaluate_minilm(rebuild_policy=None, should_execute=True):
 
     # load pre-trained torch model
     tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
-    model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
+    model = AutoModel.from_pretrained(
+        "sentence-transformers/all-MiniLM-L6-v2", torchscript=True
+    )
 
     # dummy inputs to generate the groq model
     max_seq_length = 128
@@ -34,7 +36,7 @@ def evaluate_minilm(rebuild_policy=None, should_execute=True):
 
     # compute performance on CPU and GroqChip
     if should_execute:
-        return compute_performance(
+        compute_performance(
             groq_model,
             model,
             dataset="stsb_multi_mt",
@@ -42,6 +44,8 @@ def evaluate_minilm(rebuild_policy=None, should_execute=True):
             max_seq_length=max_seq_length,
             task="sentence_similarity",
         )
+
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":

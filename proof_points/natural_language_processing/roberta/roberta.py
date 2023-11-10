@@ -23,7 +23,9 @@ def evaluate_roberta(rebuild_policy=None, should_execute=None):
     # load pre-trained torch model
     model_path = "dominiqueblok/roberta-base-finetuned-ner"
     tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
-    torch_model = RobertaForTokenClassification.from_pretrained(model_path)
+    torch_model = RobertaForTokenClassification.from_pretrained(
+        model_path, torchscript=True
+    )
 
     # dummy inputs to generate the groq model
     batch_size, max_seq_length = 1, 128
@@ -52,6 +54,8 @@ def evaluate_roberta(rebuild_policy=None, should_execute=None):
             max_seq_length=max_seq_length,
             task="ner",
         )
+
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":

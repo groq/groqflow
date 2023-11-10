@@ -15,7 +15,9 @@ from demo_helpers.args import parse_args
 
 def evaluate_deit_tiny(rebuild_policy=None, should_execute=True):
     # load torch model
-    model = ViTForImageClassification.from_pretrained("facebook/deit-tiny-patch16-224")
+    model = ViTForImageClassification.from_pretrained(
+        "facebook/deit-tiny-patch16-224", torchscript=True
+    )
     model.eval()
 
     # create dummy inputs to prime groq model
@@ -26,12 +28,13 @@ def evaluate_deit_tiny(rebuild_policy=None, should_execute=True):
 
     # compute performance on CPU and GroqChip
     if should_execute:
-        return compute_performance(
+        compute_performance(
             groq_model,
             model,
             dataset="sampled_imagenet",
             task="classification",
         )
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":
