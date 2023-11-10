@@ -27,9 +27,11 @@ def evaluate_resnet50(rebuild_policy=None, should_execute=True):
 
     # Execute PyTorch model on CPU, Groq Model and print accuracy
     if should_execute:
-        return compute_performance(
+        compute_performance(
             groq_model, pytorch_model, "sampled_imagenet", task="classification"
         )
+
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":

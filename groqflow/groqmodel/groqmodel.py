@@ -139,13 +139,13 @@ class GroqModel:
 
         # Calculate compute latency and estimate PCIe latency
         self.state.info.estimated_pcie_input_latency = (
-            self.state.info.compiled_onnx_input_bytes / pcie_bandwidth
+            self.state.info.compiled_model_input_bytes / pcie_bandwidth
         ) + pcie_latency
         self.state.info.deterministic_compute_latency = on_chip_compute_cycles / (
             frequency
         )
         self.state.info.estimated_pcie_output_latency = (
-            self.state.info.compiled_onnx_output_bytes / pcie_bandwidth
+            self.state.info.compiled_model_output_bytes / pcie_bandwidth
         ) + pcie_latency
 
         # When pipelined, the reported cycle is the duration of a single pipelining stage

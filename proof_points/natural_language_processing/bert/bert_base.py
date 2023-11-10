@@ -20,7 +20,7 @@ def get_model():
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(pretrained_model_name)
     pytorch_model = transformers.AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name
+        pretrained_model_name, torchscript=True
     )
 
     return pytorch_model.eval(), tokenizer
@@ -48,7 +48,7 @@ def evaluate_bert(rebuild_policy=None, should_execute=True):
 
     # compute performance on CPU and GroqChip
     if should_execute:
-        return compute_performance(
+        compute_performance(
             groq_model,
             pytorch_model,
             dataset="sst",
@@ -56,6 +56,8 @@ def evaluate_bert(rebuild_policy=None, should_execute=True):
             max_seq_length=max_seq_length,
             task="classification",
         )
+
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":

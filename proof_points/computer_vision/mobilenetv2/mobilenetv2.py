@@ -43,6 +43,8 @@ def evaluate_mobilenetv2(rebuild_policy=None, should_execute=None):
             groq_model, torch_model, "sampled_imagenet", task="classification"
         )
 
+    print(f"Proof point {__file__} finished!")
+
 
 if __name__ == "__main__":
     evaluate_mobilenetv2(**parse_args())

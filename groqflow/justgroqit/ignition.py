@@ -58,6 +58,25 @@ pytorch_sequence_with_quantization = stage.Sequence(
     ],
 )
 
+
+pytorch_export_torch_script_sequence = stage.Sequence(
+    "pytorch_export_torch_script",
+    "Export Pytorch Model to TorchScript",
+    [
+        gf_export.ExportPytorchToTorchScript(),
+    ],
+)
+
+pytorch_torch_importer_sequence = stage.Sequence(
+    "pytorch_torch_importer",
+    "Build PyTorch Model using Torch Importer Front-end",
+    [
+        pytorch_export_torch_script_sequence,
+        compile.CompileTorchScript(),
+        compile.Assemble(),
+    ],
+)
+
 default_keras_export_sequence = stage.Sequence(
     "default_keras_export_sequence",
     "Exporting Keras Model",
@@ -337,6 +356,13 @@ groq_model_type_to_sequence_with_quantization = {
     of_build.ModelType.PYTORCH: pytorch_sequence_with_quantization,
 }
 
+groq_model_type_torch_importer_override_to_sequence = {
+    of_build.ModelType.PYTORCH: pytorch_torch_importer_sequence,
+    of_build.ModelType.KERAS: default_keras_sequence,
+    of_build.ModelType.ONNX_FILE: default_onnx_sequence,
+    of_build.ModelType.HUMMINGBIRD: default_hummingbird_sequence,
+}
+
 
 def model_intake(
     user_model,
@@ -346,13 +372,17 @@ def model_intake(
     user_quantization_samples: Optional[Collection] = None,
 ) -> Tuple[Any, Any, stage.Sequence, of_build.ModelType]:
 
+    override_sequence_map = groq_model_type_to_sequence
+    if build.USE_TORCH_IMPORTER:
+        override_sequence_map = groq_model_type_torch_importer_override_to_sequence
+
     model, inputs, sequence, model_type = of_ignition.model_intake(
         user_model=user_model,
         user_inputs=user_inputs,
         user_sequence=user_sequence,
         user_quantization_samples=user_quantization_samples,
         override_quantization_sequence_map=groq_model_type_to_sequence_with_quantization,
-        override_sequence_map=groq_model_type_to_sequence,
+        override_sequence_map=override_sequence_map,
     )
 
     if "--auto-asm" in config.compiler_flags:

@@ -63,8 +63,7 @@ def evaluate_bert(rebuild_policy=None, should_execute=True):
     )
 
     if should_execute:
-
-        return compute_performance(
+        compute_performance(
             groq_model,
             pytorch_model,
             dataset="sst-int32",
@@ -72,6 +71,8 @@ def evaluate_bert(rebuild_policy=None, should_execute=True):
             max_seq_length=max_seq_length,
             task="classification",
         )
+
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":

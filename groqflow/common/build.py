@@ -25,6 +25,7 @@ environment_variables = {
     "dont_use_sdk": "GROQFLOW_BAKE_SDK",
     "debug": "GROQFLOW_DEBUG",
     "internal": "GROQFLOW_INTERNAL_FEATURES",
+    "torch_importer": "GROQFLOW_USE_TORCH_IMPORTER",
 }
 
 # Allow an environment variable to override the default
@@ -62,6 +63,13 @@ GROQCARD = GROQCARD_A14
 # By default, choose the dragonfly topology. Users can change this by passing in
 # the topology argument to groqit().
 TOPOLOGY = DRAGONFLY
+
+# Allow users to use the Torch Importer and bypass ONNX. Only applicable for
+# Torch models, has no other effect on other model types.
+if os.environ.get(environment_variables["torch_importer"]):
+    USE_TORCH_IMPORTER = True
+else:
+    USE_TORCH_IMPORTER = False
 
 
 class Backend(enum.Enum):
@@ -170,6 +178,9 @@ class GroqInfo(of_build.Info):
     num_parameters: Optional[int] = None
     opt_onnx_unsupported_ops: Optional[List[str]] = None
     opt_onnx_all_ops_supported: Optional[bool] = None
+    torch_script_exported: Optional[bool] = None
+    torch_importer_success: Optional[bool] = None
+    torch_importer_command: Optional[str] = None
     compiler_success: Optional[bool] = None
     compiler_command: Optional[str] = None
     assembler_success: Optional[bool] = None
@@ -181,8 +192,8 @@ class GroqInfo(of_build.Info):
     estimated_pcie_output_latency: Optional[float] = None
     estimated_throughput: Optional[float] = None
     estimated_latency: Optional[float] = None
-    compiled_onnx_input_bytes: Optional[int] = None
-    compiled_onnx_output_bytes: Optional[int] = None
+    compiled_model_input_bytes: Optional[int] = None
+    compiled_model_output_bytes: Optional[int] = None
     compiler_ram_bytes: Optional[float] = None
 
 
@@ -231,6 +242,19 @@ class GroqState(of_build.State):
     def latency_file(self):
         return os.path.join(
             of_build.output_dir(self.cache_dir, self.config.build_name), "latency.npy"
+        )
+
+    @property
+    def torch_script_dir(self):
+        return os.path.join(
+            of_build.output_dir(self.cache_dir, self.config.build_name), "torchscript"
+        )
+
+    @property
+    def torch_script_file(self):
+        return os.path.join(
+            self.torch_script_dir,
+            f"{self.config.build_name}.pt",
         )
 
     @property

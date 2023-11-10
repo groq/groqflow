@@ -30,7 +30,9 @@ def evaluate_yolov6n(rebuild_policy=None, should_execute=True):
         rebuild=rebuild_policy,
     )
     if should_execute:
-        return compute_performance(groq_model, pytorch_model, "coco", task="coco_map")
+        compute_performance(groq_model, pytorch_model, "coco", task="coco_map")
+
+    print(f"Proof point {__file__} finished!")
 
 
 if __name__ == "__main__":
