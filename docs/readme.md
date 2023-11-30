@@ -1,11 +1,12 @@
 # Documentation
+The following are links to GroqFlow documentation:
 
-1. [Install Guide](install.md): Provides detailed instructions on how to install GroqFlow.
+- [Install Guide](install.md): Instructions on how to install GroqFlow.
 
-2. [Known Issues](known_issues.md): Lists the current known issues that may occur when using GroqFlow.
+- [User Guide](user_guide.md): Overview and examples for all of GroqFlow's methods, flags, and options.
 
-3. [Read Me](readme.md): This readme.
+- [Known Issues](known_issues.md): Currently known issues that may occur when using GroqFlow.
 
-4. [User Guide](user_guide.md): Provides an overview and examples for all of GroqFlow's flags and options.
+- [Versioning](versioning.md): Explanation of GroqFlow's versioning scheme.
 
-5. [Versioning](versioning.md): Explanation of GroqFlow's versioning scheme.
+- [README.md](readme.md): This README.
