@@ -1,47 +1,37 @@
 # GroqFlow 🚀
 
-GroqFlow™ is the easiest way to get started with Groq's technology. GroqFlow provides an automated tool flow for compiling machine learning and linear algebra workloads into Groq programs and executing those programs on GroqChip™ processors.
-
-We recommend that your system meets the following hardware requirements:
-
-- To build models: 32GB or more of RAM.
-- To run models: 8 GroqChip processors is recommended, especially for larger models.
+GroqFlow™ is the easiest way to get started with Groq's technology. GroqFlow provides an automated workflow for compiling Machine Learning, Artifical Intelligence, and High-Performance Computing workloads into Groq programs and executing those programs on the Groq Language Processing Unit™ (LPU).
 
 ---
 
-## Installation Guide
+## System Requirements
 
-Sign-up on [support.groq.com](https://support.groq.com) to download and install GroqWare™ Suite version >=0.9.2.1.
+To begin, we recommend that your system meets the following software and hardware requirements:
 
-For installation instructions, please have a look at our [Install Guide](docs/install.md).
+- Ubuntu 22.04 or Rocky 8.4 Linux distribution.
+- 32GB RAM (or more) to build models.
+- 8 LPUs (especially for larger models) to run models.
+- GroqWare Suite™ version >=0.9.2.1 installation*:
+  - Groq Developer Tools Package (groq-devtools) for building and compiling models.
+  - Groq Runtime Package (groq-runtime) for running compiled models on Groq hardware.
 
-
-## Getting Started
-
-To Groq a PyTorch model, simply provide your model and inputs to the `groqit()` function. Once `groqit()` has built your model, you can execute your Groq model the same way you execute a PyTorch model.
-
-<img src="https://github.com/groq/groqflow/raw/main/docs/img/groqflow.gif"  width="800"/>
-
-
-`groqit()` also works with ONNX files and provides many customization options. You can find more information about how to use groqit() in our [User Guide](docs/user_guide.md).
+*For information on how to install GroqWare Suite on your system, create an account on our [portal](https://support.groq.com/) and view the [GroqWare Quick Start Guide](https://support.groq.com/#/downloads/view/groqware-qsg) for installation instructions.
 
 ---
 
 ## Navigating GroqFlow
 
-* [demo_helpers](demo_helpers/): Scripts used for GroqFlow demos and proof points.
+* [Documentation](docs/): All GroqFlow documentation, including the installation guide, user guide, known issues, and versioning.
 
-* [docs](docs/): All information you'd need to be successful with GroqFlow.
+* [Examples](examples/): Includes various GroqFlow examples.
 
-* [examples](examples/): Includes various GroqFlow examples.
+* [GroqFlow](groqflow/): The source code for the `groqflow` package.
 
-* [groqflow](groqflow/): The source code for the `groqflow` package.
+* [Proof Points](proof_points/): Machine learning proof points using GroqFlow.
 
-* [proof_points](proof_points/): Machine learning proof points using GroqFlow.
+* [README.md](readme.md): This README.
 
-* [readme.md](readme.md): This readme.
-
-* [setup.py](setup.py): GroqFlow setup script for installation.
+---
 
 ## Contributors
 
