@@ -856,7 +856,7 @@ class COCODataset(Dataset):
 
     def preprocess(self):
         return [
-            {"image_arrays": self.coco[i][0].unsqueeze(0).numpy()}
+            {"images": self.coco[i][0].unsqueeze(0).numpy()}
             for i in range(len(self.coco))
         ]
 
