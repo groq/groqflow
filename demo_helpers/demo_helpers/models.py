@@ -1,7 +1,17 @@
 import os
+import subprocess
+import sys
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from demo_helpers.model_download import (
+    YOLOV6N_MODEL,
+    YOLOV6N_SOURCE,
+    download_model,
+    download_source,
+)
 
 
 class M5(nn.Module):
@@ -128,6 +138,33 @@ class PointNet(nn.Module):
         xb = F.relu(self.bn2(self.dropout(self.fc2(xb))))
         output = self.fc3(xb)
         return self.logsoftmax(output)
+
+
+def get_yolov6n_model():
+    weights = download_model(YOLOV6N_MODEL)
+    source = download_source(YOLOV6N_SOURCE)
+    export_script = os.path.join(source, "deploy/ONNX/export_onnx.py")
+
+    cmd = [
+        sys.executable,
+        export_script,
+        "--weights",
+        weights,
+        "--img",
+        "640",
+        "--batch",
+        "1",
+        "--simplify",
+    ]
+    p = subprocess.Popen(
+        cmd, cwd=source, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    p.communicate()
+    if p.returncode != 0:
+        raise RuntimeError("Unable to get ONNX model")
+
+    onnx_file = weights.replace(".pt", ".onnx")
+    return onnx_file
 
 
 def load_pretrained(model_name):
