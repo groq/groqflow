@@ -33,7 +33,11 @@ def get_num_chips_available(pci_devices=None):
 
     # Capture the list of pci devices on the system using the linux lspci utility
     if pci_devices is None:
-        pci_devices = subprocess.check_output([lspci, "-n"]).decode("utf-8").split("\n")
+        pci_devices = (
+            subprocess.check_output([lspci, "-n"], stderr=subprocess.DEVNULL)
+            .decode("utf-8")
+            .split("\n")
+        )
 
     # Unique registered vendor id: 1de0, and device id: "0000"
     groq_card_id = "1de0:0000"
@@ -74,7 +78,11 @@ def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]
         # Get package info
         try:
             cmd = ["apt-cache", "policy", package]
-            package_info = subprocess.check_output(cmd).decode("utf-8").split("\n")
+            package_info = (
+                subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+                .decode("utf-8")
+                .split("\n")
+            )
         except (FileNotFoundError, subprocess.CalledProcessError) as e:
             raise exp.Error("apt-cache policy command failed") from e
 
@@ -89,7 +97,11 @@ def _installed_package_version(package: str, os_version: OS) -> Union[bool, str]
         # Get package info
         cmd = ["dnf", "info", package]
         try:
-            package_info = subprocess.check_output(cmd).decode("utf-8").split("\n")
+            package_info = (
+                subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+                .decode("utf-8")
+                .split("\n")
+            )
         except FileNotFoundError as e:
             raise exp.Error("dnf info command failed") from e
         except subprocess.CalledProcessError as e:
