@@ -182,8 +182,11 @@ def pytorch_model_inference(dataset, model):
             out = model(**inputs)
 
             if not isinstance(out, torch.Tensor):
-                if isinstance(out, tuple) and len(out) == 1:
-                    out = out[0]
+                if isinstance(out, tuple):
+                    if len(out) == 1:
+                        out = out[0]
+                    else:
+                        raise ValueError("Cannot handle tuple with len", len(out))
                 elif isinstance(out, dict):
                     if "logits" in out:
                         out = out.logits
