@@ -19,9 +19,7 @@ def evaluate_minilm(rebuild_policy=None, should_execute=True):
 
     # load pre-trained torch model
     tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
-    model = AutoModel.from_pretrained(
-        "sentence-transformers/all-MiniLM-L6-v2", torchscript=True
-    )
+    model = AutoModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
 
     # dummy inputs to generate the groq model
     max_seq_length = 128
