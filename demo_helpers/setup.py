@@ -11,7 +11,7 @@ setup(
         exclude=["*.__pycache__.*"],
     ),
     install_requires=[
-        "charset-normalizer==2.1.0",
+        "charset-normalizer==3.3.2",
         "transformers>=4.20.0",
         "datasets>=2.3.2",
         "prettytable>=3.3.0",
