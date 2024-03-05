@@ -10,6 +10,7 @@ setup(
     packages=find_packages(
         exclude=["*.__pycache__.*"],
     ),
+    include_package_data=True,
     install_requires=[
         "charset-normalizer==3.3.2",
         "transformers>=4.20.0",

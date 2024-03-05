@@ -1,0 +1,3 @@
+include demo_helpers/datasets/README.md
+include demo_helpers/pretrained_models/m5.pt
+include demo_helpers/pretrained_models/pointnet.pth
