@@ -19,6 +19,19 @@ M5's Keyword Spotting accuracy is evaluated using the [SpeechCommands dataset](h
   pip install -r requirements.txt
   ```
 
+- Since this proofpoint uses audio files, often the audio libraries must be installed on system.
+  - For Ubuntu OS:
+
+  ```bash
+  sudo apt install libsox-dev
+  ```
+
+  - For Rocky OS:
+
+  ```bash
+  sudo dnf install sox-devel
+  ```
+
 ## Build and Evaluate
 
 To build and evaluate M5:
