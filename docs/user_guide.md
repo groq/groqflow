@@ -111,7 +111,7 @@ By default, GroqFlow will automatically partition models across multiple GroqChi
 
 - Number of GroqChip processors to be used.
 - *Default*: `groqit()` automatically selects a number of chips.
-- 1, 2, 4, or 8 chips are valid options for systems using GroqCard™ accelerators (GC1-010B/GC1-0109).
+- To see a list of all multi-chip topology options, please run the `groq-compiler --help` command.
 
 ### Example:
 
@@ -243,9 +243,24 @@ See: `examples/pytorch/groqview.py`
 
 ### Compiler Flags
 
-Users familiar with the underlying compiler may want to override the default flags that `groqit()` provides to Groq Compiler. For more information about the available compiler flags, see the Compiler User Guide on Groq's Customer Portal at [support.groq.com](https://support.groq.com/#/downloads/groqcompiler-ug)
+The default flags that `groqit()` provides to Groq Compiler can be overriden with the below flags.
 
-Warning: at this time, `groqit()` does nothing to ensure that you are providing legal flags to the `compiler_flags` argument. If you provide illegal flags, `groqit()` will raise a generic exception and point you to a log file where you can learn more.
+| Compiler Flag | Description | Usage Example |
+|---------------|-------------|---------------|
+| --auto-asm | Automatically assemble the model and return a GroqCard-ready model in the required Input/Output Program (IOP) file format. This may in crease compile time. | `gmodel = groqit(model, inputs, compiler_flags = ['--auto-asm'])` |
+| --channelLast | Channel last memory format is for compiling a model's NHWC or HWC tensors in memory-preserving dimensions ordering. A transpose will automatically be added to convert data. | `gmodel = groqit(model, inputs, compiler_flags = ['--channelLast'])` |
+| --coresident model_a.onnx model_b.onnx [additional model ONNX files] | Co-resident models are models that are compiled and stored together without conflicting with each other within a single IOP file for a single GroqCard to run inference on multiple models. The compiler generates `program.0.aa`, `program.1.aa`, … , `program.n.aa` files where `n+1` equals the total number of ONNX files. Each of these .aa files must then be assembled with the `--program-package` flag for `assembler_flags` (See [Assembler Flags](#assembler-flags) section below). | `gmodel = groqit(model, inputs, compiler_flags = ['--codresident model_a.onnx model_b.onnx'], assembler_flags = ['--program-package'])` |
+| --effort (`standard` or `high`) | Adjust level of effort to optimize for program cycle count. The higher the level, the lower the program cycle count and the longer the compile time. The two options are `--effort=standard` and `--effort=high`. The larger the tensor, the more compile time saved by using standard effort. | `gmodel = groqit(model, inputs, compiler_flags = ['--effort=standard'])` |
+| --disable-input-host-reordering | Disables host-side reordering of input tensors to the expected format, allowing for faster tensor transfers. Must be used with `--effort=standard` flag. | `gmodel = groqit(model, inputs, compiler_flags = ['--disable-input-host-reordering', '--effort=standard'])` | 
+| --lstm-partitioning-sl-threshold | LSTM sequence length threshold to partition models containing LSTMs into multiple programs. Set to an integer, N, to set the length of these partial sequences. The compiler will return multiple .aa files, one for each of the partitioned programs, and an orchestration.json file containing the information needed to execute the partitioned programs.  | `gmodel = groqit(model, inputs, compiler_flags = ['--lstm-partitioning-sl-threshold=2'])` |
+| --no-invariant-checks | By default, rigorous checks are performed to ensure that the input model is a valid program and should successfully run on hardware. Some of these checks take time and this flag can be used to disable checks to speed up workflow. **Always run without this flag when finalizing model design.** | `gmodel = groqit(model, inputs, compiler_flags = ['--no-invariant-checks'])` |
+| --power-analysis | Enable power and utilization analysis. | `gmodel = groqit(model, inputs, compiler_flags = ['--power-analysis'])` |
+| --power-frequency | Frequency to be used for power calculation in MHz. The default is 900MHz. | `gmodel = groqit(model, inputs, compiler_flags = ['--power-frequency=300'])` |
+| --power-temperature | Temperature to be used for static power calculation. The default is 65.0 C. | `gmodel = groqit(model, inputs, compiler_flags = ['--power-temperature=70'])` |
+| --power-vcs | SRAM voltage to be used for power calculation in Volts. The default is 0.85V. | `gmodel = groqit(model, inputs, compiler_flags = ['--power-vcs=0.80'])` |
+| --power-vdd | Logic voltage to be used for power calculation in Volts. The default is 0.75V. | `gmodel = groqit(model, inputs, compiler_flags = ['--power-vcs=0.80'])` |
+
+Warning: at this time, `groqit()` does nothing to ensure that you are providing legal flags to the `compiler_flags` argument. If you provide illegal flags, `groqit()` will raise a generic exception and point you to a log file where you can learn more. If the log file is unhelpful, please contact us at support@groq.com. 
 
 **compiler_flags**
 - Provide the flags as a list of strings, i.e., `groqit(compiler_flags=["flag 1", "flag 2"], ...)`
