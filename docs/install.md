@@ -21,6 +21,7 @@ Make sure that your combination of GroqWare™ Suite version, OS version, and Py
 | 0.9.3     | Rocky 8.4    | 3.8            |
 | 0.10.0    | Ubuntu 22.04 | 3.10           |
 | 0.10.0    | Rocky 8.4    | 3.8            |
+| 0.11.0    | Ubuntu 22.04 | 3.10           |
 
 ### Install GroqWare
 
