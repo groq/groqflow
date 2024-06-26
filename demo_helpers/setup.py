@@ -17,7 +17,7 @@ setup(
         "datasets>=2.3.2",
         "prettytable>=3.3.0",
         "wget>=3.2",
-        "setuptools==57.2.0",
+        "setuptools==65.5.1",
         "torchvision==0.16.0",
         "torchaudio==2.1.0",
         "path>=16.4.0",
