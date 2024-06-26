@@ -19,7 +19,7 @@ setup(
         "onnx==1.14.0",
         "onnxruntime==1.15.1",
         "protobuf==3.20.3",
-        "scikit-learn==1.1.1",
+        "scikit-learn==1.5.0",
         "torch==2.1.0",
         "typeguard==4.0.0",
     ],
