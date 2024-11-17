@@ -20,7 +20,7 @@ setup(
         "onnxruntime==1.15.1",
         "protobuf==3.20.3",
         "scikit-learn==1.1.1",
-        "torch==2.1.0",
+        "torch==2.2.0",
         "typeguard==4.0.0",
     ],
     extras_require={
