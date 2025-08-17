@@ -16,7 +16,7 @@ setup(
     ),
     install_requires=[
         "mlagility==3.3.1",
-        "onnx==1.14.0",
+        "onnx==1.16.0",
         "onnxruntime==1.15.1",
         "protobuf==3.20.3",
         "scikit-learn==1.1.1",
